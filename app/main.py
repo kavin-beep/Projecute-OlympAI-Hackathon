@@ -5,21 +5,28 @@ import asyncio
 import json
 import os
 import secrets
+from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import (
+    Body,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import agents, db, media, pipeline, retrieval
 from .llm import llm
-from .schemas import BriefDraft
 from .ws import hub
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC = os.path.join(ROOT, "static")
-
-from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
@@ -640,7 +647,7 @@ async def brief_extract(group_id: str, user: dict = User) -> dict:
     try:
         brief, events = await asyncio.to_thread(pipeline.extract_brief, group_id, user["id"])
     except ValueError as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     await broadcast(group_id, events)
     return {"brief": brief}
 
@@ -664,7 +671,7 @@ async def brief_approve(group_id: str, user: dict = User) -> dict:
     try:
         brief, events = pipeline.approve_brief(group_id, user["id"])
     except ValueError as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     await broadcast(group_id, events)
     return {"brief": brief}
 
@@ -676,7 +683,7 @@ async def tickets_propose(group_id: str, user: dict = User) -> dict:
     try:
         created, events = await asyncio.to_thread(pipeline.propose_tickets, group_id)
     except ValueError as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     await broadcast(group_id, events)
     return {"tickets": created}
 
@@ -690,6 +697,32 @@ async def tickets_approve(group_id: str, user: dict = User) -> dict:
     return {"tickets": tickets}
 
 
+@app.post("/api/groups/{group_id}/tickets")
+async def ticket_create(group_id: str, payload: dict = Body(...), user: dict = User) -> dict:
+    """Any member submits a task; it waits for the host's approval and is checked for duplicates."""
+    require_member(group_id, user)
+    title = (payload.get("title") or "").strip()[:140]
+    if not title:
+        raise HTTPException(400, "Give the task a title.")
+    priority = payload.get("priority") or "Medium"
+    if priority not in ("Low", "Medium", "High"):
+        raise HTTPException(400, "Priority must be Low, Medium or High.")
+    try:
+        hours = float(payload.get("estimated_hours") or 4)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(400, "Estimated hours must be a number.") from exc
+    if not 0.5 <= hours <= 200:
+        raise HTTPException(400, "Estimated hours must be between 0.5 and 200.")
+    owner = payload.get("owner_user_id") or None
+    if owner and not db.is_member(group_id, owner):
+        raise HTTPException(400, "The owner must be a member of this group.")
+    ticket, events = await asyncio.to_thread(
+        pipeline.create_ticket, group_id, user["id"], title, (payload.get("detail") or "").strip(),
+        priority, hours, owner)
+    await broadcast(group_id, events)
+    return {"ticket": ticket}
+
+
 @app.patch("/api/groups/{group_id}/tickets/{ticket_id}")
 async def ticket_update(group_id: str, ticket_id: str, payload: dict = Body(...), user: dict = User) -> dict:
     """Host only: edit a task (title, detail, priority, hours, owner, status)."""
@@ -697,7 +730,7 @@ async def ticket_update(group_id: str, ticket_id: str, payload: dict = Body(...)
     try:
         ticket, events = pipeline.update_ticket(group_id, ticket_id, payload, user["id"])
     except ValueError as exc:
-        raise HTTPException(404, str(exc))
+        raise HTTPException(404, str(exc)) from exc
     await broadcast(group_id, events)
     return {"ticket": ticket}
 
@@ -709,7 +742,7 @@ async def ticket_confirm(group_id: str, ticket_id: str, user: dict = User) -> di
     try:
         ticket, events = pipeline.confirm_hours(group_id, ticket_id, user["id"])
     except ValueError as exc:
-        raise HTTPException(404, str(exc))
+        raise HTTPException(404, str(exc)) from exc
     await broadcast(group_id, events)
     return {"ticket": ticket}
 
@@ -735,9 +768,70 @@ async def alert_resolve(group_id: str, alert_id: str, payload: dict = Body(...),
         alert, events = await asyncio.to_thread(
             pipeline.resolve_alert, group_id, alert_id, user["id"], resolution)
     except ValueError as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     await broadcast(group_id, events)
     return {"alert": alert}
+
+
+@app.post("/api/groups/{group_id}/alerts/{alert_id}/dismiss")
+async def alert_dismiss(group_id: str, alert_id: str, payload: dict = Body(default={}), user: dict = User) -> dict:
+    """Host only: close a false alert without recording a decision."""
+    require_host(group_id, user)
+    reason = (payload.get("reason") or "").strip() or "Not a real conflict"
+    try:
+        alert, events = pipeline.dismiss_alert(group_id, alert_id, user["id"], reason[:300])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    await broadcast(group_id, events)
+    return {"alert": alert}
+
+
+# -------------------------------------------- sources: PRDs, bug tickets, meetings
+@app.get("/api/groups/{group_id}/documents")
+def list_documents(group_id: str, user: dict = User) -> dict:
+    """The group's source documents with how many flags each raised."""
+    require_member(group_id, user)
+    return {"documents": pipeline.workspace_state(group_id)["documents"]}
+
+
+@app.post("/api/groups/{group_id}/documents")
+async def add_document(group_id: str, payload: dict = Body(...), user: dict = User) -> dict:
+    """Add a PRD, bug ticket or meeting summary; the agents cross-check it straight away."""
+    require_member(group_id, user)
+    kind = payload.get("kind") or ""
+    if kind not in pipeline.KIND_LABEL:
+        raise HTTPException(400, "Choose PRD, bug ticket or meeting summary.")
+    title = (payload.get("title") or "").strip()[:120]
+    content = (payload.get("content") or "").strip()
+    if not title:
+        raise HTTPException(400, "Give the source a title.")
+    if len(content) < 20:
+        raise HTTPException(400, "Paste the text of the document (at least a sentence).")
+    if len(content) > 20000:
+        raise HTTPException(400, "That document is too long for the prototype (20,000 characters max).")
+    doc, alerts, events = await asyncio.to_thread(
+        pipeline.add_document, group_id, user["id"], kind, title, content)
+    await broadcast(group_id, events)
+    return {"document": doc, "alerts": alerts}
+
+
+@app.get("/api/groups/{group_id}/documents/{document_id}")
+def document_detail(group_id: str, document_id: str, user: dict = User) -> dict:
+    """One source document with its statements and the flags it raised."""
+    require_member(group_id, user)
+    doc = pipeline.get_document(group_id, document_id)
+    if not doc:
+        raise HTTPException(404, "Document not found.")
+    return {"document": doc}
+
+
+@app.get("/api/groups/{group_id}/activity/export")
+def activity_export(group_id: str, user: dict = User) -> JSONResponse:
+    """Download the full multi-agent event stream as JSON."""
+    require_member(group_id, user)
+    events = pipeline.activity_log(group_id)
+    return JSONResponse({"group_id": group_id, "events": events},
+                        headers={"Content-Disposition": 'attachment; filename="projecute-event-log.json"'})
 
 
 @app.post("/api/groups/{group_id}/alerts/scan")

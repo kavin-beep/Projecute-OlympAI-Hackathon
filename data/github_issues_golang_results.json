@@ -1,0 +1,119 @@
+{
+ "source": "https://github.com/golang/go/issues",
+ "backend": "Sentence Transformers + FAISS",
+ "dedup": {
+  "pairs": 90,
+  "positives": 45,
+  "search_fixed_threshold": {
+   "threshold": 0.5,
+   "precision": 0.75,
+   "recall": 0.933,
+   "f1": 0.832,
+   "tp": 42,
+   "fp": 14,
+   "fn": 3
+  },
+  "search_best_threshold": {
+   "threshold": 0.5,
+   "precision": 0.75,
+   "recall": 0.933,
+   "f1": 0.832,
+   "tp": 42,
+   "fp": 14,
+   "fn": 3
+  },
+  "architect_rules": {
+   "precision": 0.808,
+   "recall": 0.467,
+   "f1": 0.592,
+   "tp": 21,
+   "fp": 5,
+   "fn": 24
+  },
+  "architect_live": {
+   "pairs": 80,
+   "model": "openai/gpt-oss-120b",
+   "precision": 1.0,
+   "recall": 0.575,
+   "f1": 0.73,
+   "tp": 23,
+   "fp": 0,
+   "fn": 17
+  }
+ },
+ "search": {
+  "queries": 45,
+  "candidates": 36,
+  "recall_at_1": 0.6,
+  "recall_at_5": 0.756
+ },
+ "clusters": {
+  "issues": 81,
+  "true_groups": 36,
+  "fixed": {
+   "threshold": 0.5,
+   "found_groups": 25,
+   "precision": 0.32,
+   "recall": 0.859,
+   "f1": 0.466,
+   "tp": 55,
+   "fp": 117,
+   "fn": 9
+  },
+  "best": {
+   "threshold": 0.75,
+   "found_groups": 43,
+   "precision": 0.565,
+   "recall": 0.609,
+   "f1": 0.586,
+   "tp": 39,
+   "fp": 30,
+   "fn": 25
+  }
+ },
+ "triage_rules": {
+  "issues": 260,
+  "category_accuracy": 0.558,
+  "by_label": {
+   "bug": {
+    "n": 95,
+    "correct": 69
+   },
+   "docs": {
+    "n": 78,
+    "correct": 34
+   },
+   "feature": {
+    "n": 87,
+    "correct": 42
+   }
+  },
+  "release_blockers": 8,
+  "release_blockers_marked_high": 4,
+  "non_blockers_marked_high": 43,
+  "non_blockers": 252
+ },
+ "triage_live": {
+  "model": "openai/gpt-oss-120b",
+  "issues": 40,
+  "category_accuracy": 0.8,
+  "by_label": {
+   "bug": {
+    "n": 14,
+    "correct": 12
+   },
+   "docs": {
+    "n": 17,
+    "correct": 13
+   },
+   "feature": {
+    "n": 9,
+    "correct": 7
+   }
+  },
+  "release_blockers": 1,
+  "release_blockers_marked_high": 1,
+  "non_blockers_marked_high": 6,
+  "non_blockers": 39
+ }
+}

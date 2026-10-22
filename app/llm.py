@@ -13,7 +13,8 @@ import random
 import re
 import threading
 import time
-from typing import Any, Callable, Iterator, Type, TypeVar
+from collections.abc import Callable, Iterator
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -31,12 +32,13 @@ def _load_dotenv() -> None:
     path = os.path.join(root, ".env")
     if not os.path.exists(path):
         return
-    for line in open(path, encoding="utf-8"):
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
 _load_dotenv()
@@ -164,7 +166,7 @@ class LLM:
     # ---------------- structured ----------------
     def structured(
         self,
-        schema: Type[T],
+        schema: type[T],
         *,
         system: str,
         user: str,
@@ -186,7 +188,7 @@ class LLM:
             {"role": "user", "content": user},
         ]
         last_error = ""
-        for attempt in range(MAX_RETRIES):
+        for _attempt in range(MAX_RETRIES):
             raw = self._call_with_backoff(msgs, temperature, max_tokens, json_mode=True)
             if raw is None:
                 break

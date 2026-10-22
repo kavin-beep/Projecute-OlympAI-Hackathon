@@ -90,6 +90,5 @@ def test_a_bad_token_cannot_open_a_socket(client, demo):
     import pytest
     from starlette.websockets import WebSocketDisconnect
 
-    with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect("/ws?token=nope") as ws:
-            ws.receive_json()
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect("/ws?token=nope") as ws:
+        ws.receive_json()

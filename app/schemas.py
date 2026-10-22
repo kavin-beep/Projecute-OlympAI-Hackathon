@@ -62,6 +62,16 @@ class ArchitectVerdict(BaseModel):
     options: list[str] = Field(default_factory=list)
 
 
+class NumberedVerdict(ArchitectVerdict):
+    """One verdict inside a batch, tied to its pair by number."""
+    pair: int = Field(ge=1)
+
+
+class ArchitectBatch(BaseModel):
+    """Verdicts for several statement pairs from one batched Architect call."""
+    verdicts: list[NumberedVerdict] = Field(default_factory=list)
+
+
 class AcceptanceCriteria(BaseModel):
     """Acceptance criteria the QA agent writes for a ticket."""
     criteria: list[str] = Field(default_factory=list)
@@ -79,3 +89,32 @@ class UnitTestVerdict(BaseModel):
     verdict: Literal["match", "mismatch"]
     summary: str = ""
     differences: list[str] = Field(default_factory=list)
+
+
+class Blocker(BaseModel):
+    """Something that stops or delays planned work, found in a source document."""
+    statement: str = Field(min_length=1)
+    blocks: str = ""
+    explanation: str = ""
+
+
+class BlockerList(BaseModel):
+    """The blockers the PM agent found in one source document."""
+    blockers: list[Blocker] = Field(default_factory=list)
+
+
+class TriageResult(BaseModel):
+    """How the PM agent triages a bug ticket or issue."""
+    category: Literal["bug", "feature", "question", "docs"] = "bug"
+    priority: Priority = "Medium"
+    estimated_hours: float = Field(default=4, ge=0.5, le=200)
+    summary: str = ""
+
+    @field_validator("estimated_hours", mode="before")
+    @classmethod
+    def _coerce(cls, v):
+        """Accept hours given as text and default to 4 when unreadable."""
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return 4.0

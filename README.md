@@ -13,7 +13,7 @@
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-agents-1C3C3C">
   <img alt="FAISS" src="https://img.shields.io/badge/Sentence%20Transformers-FAISS-4FE0A8">
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-storage-003B57?logo=sqlite&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-24%20passed-2EA44F">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-32%20passed-2EA44F">
   <img alt="Runs in GitHub Codespaces" src="https://img.shields.io/badge/runs%20in-GitHub%20Codespaces-24292F?logo=github&logoColor=white">
 </p>
 
@@ -72,8 +72,62 @@ one and **Sritharan N S** in the other, and follow the
 
 ---
 
+## ✅ Requirements checklist
+
+Every requirement from the challenge brief, the submission rules and our Stage 1
+deck, with where to see it.
+
+**Challenge brief: Multiplayer AI Sprint & Architecture Manager**
+
+| Requirement | Where it is met |
+|---|---|
+| Collaborative multi-agent sprint dashboard | Group workspace with live WebSocket updates in every member's window |
+| Multiple team members assign tasks | PM agent proposes owners; any member submits tasks with a suggested owner (**Tasks → New task**); the host approves and reassigns |
+| Agents cross-check PRDs, bug tickets and meeting summaries | **Sources**: each statement is checked against the chat, other sources and tasks (`pipeline.add_document`, source-review graph) |
+| Detect blockers | PM agent flags blockers in sources as high-severity alerts with the affected tasks |
+| Resolve architectural conflicts | Contradiction / assumption alerts with exact evidence; host resolves, decision recorded, QA writes criteria |
+| 1. Simultaneous multi-user sessions with role-based agents (PM, QA, Architect) | Separate sessions per window; PM, Architect and QA agents in LangGraph; tests: `test_live_updates.py`, `test_privacy.py` |
+| 2. Parse unstructured chat logs into structured tickets (Task, Priority, Estimated Hours) | PM agent → Pydantic `TicketProposal` (title, detail, priority, estimated_hours, owner) |
+| 3. Conflict-detection agent flags duplicate issues or contradicting requirements across team submissions | Architect agent on chat messages, source documents and submitted tasks: duplicate / contradiction / assumption / unclear |
+| Dataset: GitHub Issues, used to benchmark clustering, de-duplication and triage | 45 real duplicate pairs and 260 labelled issues from github.com/golang/go, scored for de-duplication, search, clustering and triage: [results](#real-github-issues-benchmark) (Kaggle's copy has no duplicate labels; see why there) |
+| Target stack | Python, FastAPI + WebSockets, LangGraph, FAISS; the web UI is HTML/CSS/JS as our deck specifies |
+| Deliverable: live collaborative web dashboard | <https://projecute.onrender.com>, plus Codespaces and local options |
+| Deliverable: multi-agent event stream logs | **Activity** (live, timestamped) and **Download event log** (JSON) |
+| Deliverable: automated ticket generator | PM agent tickets from chat; fix tasks from bug tickets |
+| Deliverable: simulated conflict-resolution tests | `scripts/simulate_conflict_resolution.py` (18 scenarios, end to end) and `tests/` |
+
+**Submission rules**
+
+| Rule | Where it is met |
+|---|---|
+| ZIP with all code files and assets | `projecute-submission.zip` (no secrets, no local database) |
+| Main file named `main.py` | `main.py` in the root starts the app |
+| README: setup and installation | [Setup and installation](#-setup-and-installation), [Quick start](#-quick-start-for-judges) |
+| README: description of each file | [Every file and its purpose](#-every-file-and-its-purpose) |
+| README: how to run the main code | [Running the main code](#-running-the-main-code) |
+| README: dependencies | [Dependencies](#-dependencies), `requirements.txt` |
+| README: AI tools used | [AI tools used](#-ai-tools-used) |
+| Well-commented code | Every module, class and function has a docstring or comment |
+| Code standards | `ruff` (pycodestyle, pyflakes, bugbear, pyupgrade, simplify, isort rules) passes with no findings |
+| Original work, credited | AI tools, libraries, fonts and the GitHub data source are all credited below |
+
+**Our Stage 1 deck**
+
+| Slide | Promise | Where it is met |
+|---|---|---|
+| 4 | Individual AI chat; reusable outputs; one shared brief and assigned tasks; expose conflicts before implementation | Individual chat, individual workspace, Brief + Tasks, Alerts |
+| 5 | Individual chat, group chat (public AI or private help with usage-only notices), individual workspace (content, emails, code as named items), group workspace; host approves assignments and group changes, including AI access | All four areas; host-only approvals and AI switches, enforced server-side |
+| 6 | HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled mock mode; Pydantic, retries, cache, backoff; GitHub Issues subset + planted conflicts | All used; see [How it works](#-how-it-works-the-agent-pipeline) and [Data and evaluation](#-data-and-evaluation) |
+| 7 | PM brief edited by team, approved by host; tickets with owner; embeddings + FAISS + Architect; flags with sources, dependent tickets, hours; host resolves; QA criteria; live dashboard | The pipeline, step by step |
+| 8 | Two-user dashboard, ticket generator, event stream; duplicate precision/recall on real issues; 15+ planted conflicts with detection and evidence; private/public access, host approvals, live updates verified | Duplicate precision/recall on 45 real GitHub pairs; 18 planted conflicts (rules and live AI); 32 tests |
+| 10 | Decision impact; each affected ticket once with team-confirmed hours; Parallel Futures; Human Unit Test; exact messages on every flag; host approves | Decisions list their tasks; impact line; Brief → Parallel Futures; task panel → Human Unit Test |
+| 11 | Cache, batch, backoff, mock mode; evidence, "unclear", human review; separate storage and permission checks; one complete two-user workflow | Answer cache, batched Architect calls, retry with backoff, labelled demo mode; "unclear" alerts and **Dismiss**; permission tests |
+| 14 | Explicit sharing only; group AI reads only group messages; private AI use announced with no content; host approves settings; public or synthetic demo text; keys in environment files | Privacy tests; `.env` and Render secrets |
+| 17 | Find items by name in projects; items link to source chat; private until shared; team outputs beside decisions; editable text and code, never executed | Individual workspace and Team outputs |
+
 ## Contents
 
+0. [Requirements checklist](#-requirements-checklist)
 1. [The problem](#-the-problem)
 2. [What Projecute does](#-what-projecute-does)
 3. [Features](#-features)
@@ -114,6 +168,7 @@ plan.**
 | Create and organise reusable outputs | Individual workspace: named items (content, email, code, image, audio) in projects |
 | Confirm one shared project brief and generate assigned tasks | PM agent drafts the brief; the team edits it and the host approves; PM proposes tickets with owners |
 | Expose conflicts and affected work before implementation | Architect agent flags duplicates and contradictions, with source messages, affected tasks and hours |
+| *(challenge brief)* Cross-check PRDs, bug tickets and meeting summaries to detect blockers and resolve architectural conflicts | **Sources**: paste a PRD, bug ticket or meeting summary; the Architect checks every statement against the chat, the other sources and the tasks; the PM agent flags blockers and triages bugs into tasks |
 
 ---
 
@@ -126,15 +181,19 @@ plan.**
 | 💬 **Individual chat** | Private AI answers, ideas, explanations and learning. Streamed Markdown replies, chats grouped by date, rename, delete and search. Nothing here reaches the group unless you share it. |
 | 👥 **Group chat** | Channels, replies, reactions and a typing indicator. Choose **public AI** (the answer is posted for everyone) or **private help** (only you see it; the group sees just *"Name used AI"*). The host can switch either mode off. |
 | 🗂️ **Individual workspace** | Generate named items: content, email drafts, code (stored as text, never executed), images and audio. Organise them in projects, search by name, edit them, follow a link back to the source chat, and share an item to the group or make it private again. |
-| 🏢 **Group workspace** | Six sections with live count badges: **Brief**, **Tasks**, **Decisions**, **Alerts**, **Activity** and **Team outputs**. |
+| 🏢 **Group workspace** | Seven sections with live count badges: **Brief** (with Parallel Futures), **Sources** (PRDs, bug tickets, meeting summaries), **Tasks** (any member can submit one; the host approves), **Decisions** (each lists the tasks it changes), **Alerts** (resolve, or dismiss a false alert), **Activity** (the multi-agent event stream, downloadable as JSON) and **Team outputs**. |
 
 ### The AI agents
 
 | Agent | Role |
 |---|---|
-| 🧭 **PM agent** | Reads the team chat, drafts the **project brief**, then proposes **tickets: task, priority, estimated hours and a suggested owner** |
-| 🏗️ **Architect agent** | Uses embeddings and FAISS to find claims related to each new message, then decides: **duplicate**, **contradiction**, **assumption mismatch**, **unclear** or none |
+| 🧭 **PM agent** | Reads the team chat, drafts the **project brief**, then proposes **tickets: task, priority, estimated hours and a suggested owner**. Finds **blockers** in meeting summaries and other sources, and **triages bug tickets** (category, priority, hours) into proposed fix tasks |
+| 🏗️ **Architect agent** | Uses embeddings and FAISS to find claims related to each new chat message, source-document statement or submitted task, then decides: **duplicate**, **contradiction**, **assumption mismatch**, **unclear** or none |
 | 🧪 **QA agent** | After the host resolves an alert, writes **acceptance criteria** for every affected task |
+
+The agents run as three **LangGraph** graphs: planning (`pm_brief → pm_tickets`),
+chat review (`retrieve → architect`) and source review
+(`split → retrieve → architect → pm_blockers → pm_triage`).
 
 ### Innovations (deck slide 10)
 
@@ -146,13 +205,16 @@ plan.**
 - **Human Unit Test.** The task's creator and its assignee each describe the task
   in their own words. A mismatch is flagged before work starts.
 - **Evidence on every flag.** Every alert quotes the exact source messages and who
-  wrote them. The host approves the resolution.
+  wrote them, or the exact line of the PRD, bug ticket or meeting summary. The
+  host approves the resolution, or dismisses a false alert without recording a
+  decision.
 
 ### Host approvals
 
-The host approves the **brief**, the **task assignments**, every **task edit**,
-**alert resolutions** and **who can use AI** in the group. The server enforces
-this, not just the interface, and tests cover it.
+The host approves the **brief**, the **task assignments** (including tasks members
+submit and fix tasks the PM agent proposes from bug tickets), every **task edit**,
+**alert resolutions and dismissals** and **who can use AI** in the group. The
+server enforces this, not just the interface, and tests cover it.
 
 ---
 
@@ -204,19 +266,54 @@ sequenceDiagram
      unclear).
    - **Impact:** related tickets are retrieved for *both* source messages,
      de-duplicated, and their confirmed hours summed.
-4. **Resolution.** The host picks or writes a resolution. It is recorded as a
-   **decision**, and the QA agent writes acceptance criteria for each affected
-   task.
-5. **Live updates.** Every step is broadcast over WebSockets to each member's
-   open windows, and logged in **Activity** with a timestamp.
+4. **Sources.** Any member adds a PRD, bug ticket or meeting summary. It is split
+   into statements, and each is retrieved against the chat, the other sources
+   and (for bugs) existing bug reports and fix tasks:
+   - **Conflicts:** the Architect keeps contradictions and assumption mismatches,
+     one alert per statement, quoting every message or line it disagrees with.
+     The chat review also checks new messages against these sources.
+   - **Blockers:** the PM agent lists statements that stop or delay work ("blocked
+     until…", "waiting on…") as high-severity alerts with the affected tasks.
+   - **Bugs:** a bug ticket is triaged (category, priority, hours) into a
+     proposed *Fix* task for the host to approve. A report that repeats an earlier
+     bug is flagged as one duplicate alert instead. A bug *in* a feature is not
+     treated as a duplicate of the feature.
+   - **Rate limits:** at most 8 Architect checks run per document, strongest
+     matches first, to stay inside free-tier limits.
+5. **Task submissions.** Any member can submit a task. It waits for the host, and
+   the Architect checks it against existing tasks so the same work isn't added
+   twice.
+6. **Resolution.** The host picks or writes a resolution. It is recorded as a
+   **decision** listing the tasks it changes, and the QA agent writes acceptance
+   criteria for each affected task. A false alert can be **dismissed** instead,
+   with no decision and no task changes.
+7. **Live updates.** Every step is broadcast over WebSockets to each member's
+   open windows, and logged in **Activity** with a timestamp. **Download event
+   log** saves the whole multi-agent event stream as JSON.
+
+```mermaid
+flowchart LR
+    S[PRD / bug ticket / meeting summary] --> SP[split into statements]
+    SP --> RT[retrieve related claims<br/>chat · other sources · fix tasks]
+    RT --> AR[Architect agent<br/>contradiction · assumption · duplicate]
+    AR --> BL[PM agent<br/>blockers]
+    BL --> TR[PM agent<br/>bug triage → proposed fix task]
+    AR & BL --> AL[Alerts with exact quotes,<br/>affected tasks and hours]
+    AL --> H{Host}
+    H -->|resolve| DE[Decision + QA criteria]
+    H -->|dismiss| X[Closed, no decision]
+```
 
 ### Reliable AI output
 
 - Every AI JSON answer is validated with a **Pydantic schema**
   (`app/schemas.py`). If it doesn't validate, the error is sent back to the model
   for another try.
-- Answers are **cached**. Rate limits and timeouts are retried with
-  **exponential backoff**.
+- Answers are **cached**. Architect checks are **batched**: the related pairs
+  for one message or document go to the model in a single call, and any pair
+  missing from the reply falls back to its own call. Rate limits and timeouts are
+  retried with **exponential backoff**. Together, as slide 11 promises, these
+  keep the free tier usable.
 - Without an API key, or if the provider fails, the app switches to **labelled
   demo mode**. Text answers become fixed stand-ins, and the decisions come from
   transparent text rules. The header always says which mode is active.
@@ -254,32 +351,96 @@ flowchart LR
 
 | Data | Where | Used for |
 |---|---|---|
-| Demo team conversation (written by the team, synthetic) | `scripts/seed_demo.py` | The staged demo: guest checkout, then a new login requirement |
+| **Real GitHub issues** from [github.com/golang/go](https://github.com/golang/go/issues): 45 duplicate pairs (36 originals) and 260 labelled issues | `data/github_issues_golang.json` (built by `scripts/fetch_github_issues.py`) | Benchmark: de-duplicate, search, cluster and triage |
 | 18 planted conflict scenarios, each with 5 distractor claims | `scripts/evaluate_conflicts.py` | Detection and evidence correctness (deck: *15+ planted conflicts*) |
+| The same 18 scenarios run end to end | `scripts/simulate_conflict_resolution.py` | Simulated conflict-resolution tests |
+| Demo team conversation (written by the team, synthetic) | `scripts/seed_demo.py` | The staged demo: guest checkout, then a new login requirement |
 | 16 labelled duplicate pairs (synthetic, marked SYNTHETIC) | `data/sample_duplicates_SYNTHETIC.csv` | Smoke test for duplicate precision and recall |
-| Kaggle GitHub Issues subset (planned) | not included | Benchmark duplicate precision and recall on real issues |
 
-**Results.** Measured on 22 October 2026 on Windows 11 with Python 3.13. Conflict
-decisions came from the built-in rules (no AI key), and claim search used
-Sentence Transformers + FAISS:
+### Real GitHub Issues benchmark
+
+**Why GitHub's own data rather than Kaggle's copy.** The deck and the challenge
+name the Kaggle GitHub Issues dataset. Its dumps carry issue titles and bodies,
+but no record of which issues are duplicates, so they cannot score
+de-duplication. We used the same kind of data, real GitHub issues, taken from the
+Go project with its **own answer key**:
+- **Duplicates:** the maintainers' *"Duplicate of #N"* comments.
+- **Triage:** the `FeatureRequest`, `Documentation`, `NeedsFix` and
+  `release-blocker` labels.
+
+`scripts/evaluate_duplicates.py` still accepts any labelled CSV, including one
+built from Kaggle.
+
+**How each part is scored:**
+- **De-duplication:** every real pair is matched with a *hard* negative, the same
+  duplicate paired with another issue from the same Go component (e.g. two
+  `cmd/compile:` issues).
+- **Search:** each duplicate is ranked against all 36 originals.
+- **Clustering:** groups found by similarity are compared with the maintainers'
+  duplicate groups.
+- **Triage:** compares the PM agent's category and priority with the labels.
+
+Measured on 22 October 2026, with Sentence Transformers + FAISS search and the
+live model `openai/gpt-oss-120b` on Groq:
 
 ```
-pytest                 24 passed
+De-duplication (45 real duplicates + 45 same-component hard negatives)
+  Search alone, fixed threshold 0.50     precision 0.750  recall 0.933  F1 0.832
+  Architect agent, built-in rules        precision 0.808  recall 0.467  F1 0.592
+  Architect agent, live LLM (80 pairs)   precision 1.000  recall 0.575  F1 0.730
 
-evaluate_conflicts     18 scenarios  ·  detection 18/18  ·  evidence 16/16
-                       contradiction 7/7 · assumption 4/4 · duplicate 4/4 · none 2/2 · unclear 1/1
+Search: each duplicate ranked against all 36 originals
+  recall@1 0.600   recall@5 0.756
 
-evaluate_duplicates    16 synthetic pairs  ·  precision 1.000 · recall 1.000 · F1 1.000
+Clustering (81 issues, 36 true duplicate groups)
+  fixed threshold 0.50                   25 groups  pairwise precision 0.320  recall 0.859  F1 0.466
+  best threshold 0.75 (tuned on this set) 43 groups  pairwise precision 0.565  recall 0.609  F1 0.586
+
+Triage by the PM agent (bug / feature / docs)
+  built-in rules, 260 issues             accuracy 0.558   release-blockers marked High 4/8
+  live LLM, 40 issues                    accuracy 0.800   release-blockers marked High 1/1, false High 6/39
 ```
 
-> **Honest note.** Both evaluations are small and were written by the team, so
-> they show that the pipeline works. They are not evidence of real-world
-> accuracy. As the deck says, *Stage 1 makes no accuracy claims*. The **Kaggle
-> GitHub Issues** benchmark has not been run yet. With the TF-IDF fallback instead
-> of embeddings, an earlier run scored 17/18 on conflicts and recall 0.875 on
-> duplicates.
+**What this shows:**
+- **Search** is the strong part. It surfaces 93% of real duplicates, and the
+  true original is in the top 5 for three-quarters of them.
+- **The live Architect is careful.** Every pair it called a duplicate really was
+  one (precision 1.00), but it confirms only 58%, because Go duplicates are often
+  worded very differently. In the app that's the right trade-off: a missed
+  duplicate costs little, while a false alert wastes the host's time.
+- **Live AI triage** is clearly better than the rules (80% vs 56%).
+- **Clustering** whole issue sets is the weakest part, and the most obvious next
+  improvement.
 
-To run the duplicate evaluation on a labelled Kaggle subset:
+These are measurements on a small real sample, not a general accuracy claim. As
+the deck says, *Stage 1 makes no accuracy claims*. Raw results are in
+`data/github_issues_golang_results.json`. Re-run them with
+`python -m scripts.evaluate_github_issues --live 40`.
+
+### Planted conflicts, simulation, tests
+
+```
+pytest                         32 passed
+
+evaluate_conflicts             18 scenarios, each with 5 distractors
+  built-in rules               detection 18/18 · evidence 16/16
+  live LLM (gpt-oss-120b)      detection 17/18 · evidence 15/16
+                               (the miss: an "unclear" pair the model called "no issue", so no false alarm)
+
+simulate_conflict_resolution   18 scenarios end to end (built-in rules)
+                               detect 18/18 · evidence 16/16 · impact 16/16 · resolve 16/16
+                               QA criteria 15/15 · closed stays closed 16/16
+                               flagged scenarios that completed every step: 16/16
+
+evaluate_duplicates            16 synthetic pairs · precision 1.000 · recall 1.000
+```
+
+> **Honest note.** The planted scenarios and the synthetic pairs were written by
+> the team, so they show the pipeline works end to end; the GitHub benchmark
+> above is the real-world check. With the TF-IDF fallback instead of embeddings
+> (used on the free hosted demo), an earlier run scored 17/18 on planted conflicts.
+
+To score your own labelled pairs (for example, a Kaggle subset you have labelled):
 
 ```bash
 python -m scripts.evaluate_duplicates path/to/labelled.csv --limit 500
@@ -332,7 +493,10 @@ automatically.
 | `python -m scripts.seed_demo --full` | Reset and also run the conflict and its resolution |
 | `python -m pytest` | Run the tests |
 | `python -m scripts.evaluate_conflicts` | Planted-conflict evaluation |
-| `python -m scripts.evaluate_duplicates data/sample_duplicates_SYNTHETIC.csv` | Duplicate evaluation |
+| `python -m scripts.evaluate_duplicates data/sample_duplicates_SYNTHETIC.csv` | Duplicate evaluation (synthetic smoke test) |
+| `python -m scripts.simulate_conflict_resolution` | Simulated conflict-resolution tests, end to end |
+| `python -m scripts.evaluate_github_issues` | Real GitHub Issues benchmark: de-duplicate, cluster, triage (add `--live 40` for the live LLM) |
+| `python -m scripts.fetch_github_issues` | Re-download the GitHub Issues benchmark data (already included) |
 
 **Settings** (environment variables or `.env`):
 
@@ -375,20 +539,30 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 1. **The problem (10s).** Two windows side by side: Kavin the host and Sritharan
    a member. *"Two people, one project, and no shared idea of what was agreed."*
 2. **Shared workspace → Brief (20s).** The PM agent wrote the brief from the
-   team's own chat, and the host approved it. **Tasks** shows four tasks with
+   team's own chat, and the host approved it. **Tasks** shows the tasks with
    owners, priorities and estimates the team confirmed.
 3. **The scope change (25s).** In Sritharan's window, post in `#checkout`:
    > Update from the client: every customer must log in before they can pay, so
    > checkout now requires an account.
 4. **The alert (35s).** In Kavin's window, open **Alerts**. The card says the
-   messages disagree about checkout and quotes **both source messages** with
-   their authors. It states the impact: **4 tasks, about 20 hours**.
+   statements disagree about checkout and quotes **both source messages** with
+   their authors. It states the impact, for example *"Impact: 4 tasks, about 20
+   hours"* (the exact tasks depend on what the PM agent proposed).
 5. **The host decides (20s).** Pick a resolution and press **Approve this
    resolution**. Sritharan's window updates on its own: the alert is resolved, a
    decision is recorded, and the QA agent's acceptance criteria appear.
 6. **Privacy (20s).** In Sritharan's window, switch to **Private help** and ask
    anything. Kavin's window shows only *"Sritharan N S used AI"*, with no prompt,
    answer or topic. Finish on **Activity**: every agent action, timestamped.
+
+**Extra (60s): PRDs, bug tickets and meeting summaries.** Open **Sources → Add a
+source** and paste any of these:
+
+| Type | Title | Text to paste | What happens |
+|---|---|---|---|
+| PRD | Checkout PRD v2 | `- Every customer must create an account and log in before checkout.`<br>`- The checkout summary screen shows the cart total before payment.` | Contradiction alert quoting the PRD line and the chat messages that said no login |
+| Meeting summary | Sprint sync | `- Payment step is blocked until the payment provider approves our sandbox account.`<br>`- QA is waiting on test cards from finance.` | Two blocker alerts with the affected tasks |
+| Bug ticket | Wrong total on summary | `The summary screen before payment shows the cart total without shipping, so the total is wrong.` | Triaged into a proposed *Fix* task; paste a reworded copy as a second bug ticket to see it flagged as a duplicate |
 
 ---
 
@@ -429,6 +603,9 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 | `scripts/seed_demo.py` | Resets the database and stages the demo team, chat, approved brief and tasks |
 | `scripts/evaluate_conflicts.py` | Scores the 18 planted conflict scenarios |
 | `scripts/evaluate_duplicates.py` | Scores duplicate detection on any labelled CSV of pairs |
+| `scripts/simulate_conflict_resolution.py` | Runs every planted scenario through the full pipeline: detect, evidence, impact, host resolution, decision, QA, closed |
+| `scripts/fetch_github_issues.py` | Downloads the real GitHub Issues benchmark set from github.com/golang/go (public API, resumable) |
+| `scripts/evaluate_github_issues.py` | Benchmarks de-duplication, search, clustering and triage on that set |
 | `scripts/__init__.py` | Marks `scripts` as a package so the tools run with `python -m` |
 | **tests/** | **Automated tests (pytest)** |
 | `tests/conftest.py` | Test setup: a separate temporary database and a seeded demo |
@@ -436,10 +613,13 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 | `tests/test_approvals.py` | Host-only approvals: brief, assignments, task edits, AI access, resolutions |
 | `tests/test_live_updates.py` | WebSocket updates reach the other member's window |
 | `tests/test_llm_recovery.py` | Live AI comes back by itself after a provider error |
+| `tests/test_sources.py` | PRD conflicts, meeting-summary blockers, bug triage and duplicate bugs, member task submissions, dismissing false alerts, decision impact, the event-log download |
 | `tests/__init__.py` | Marks `tests` as a package |
 | **data/** | |
 | `data/sample_duplicates_SYNTHETIC.csv` | 16 synthetic labelled pairs for the duplicate smoke test |
 | `data/projecute.db` | SQLite database, created at run time (git-ignored) |
+| `data/github_issues_golang.json` | Real public issues from github.com/golang/go: duplicate pairs (with the maintainers' "Duplicate of #N" links) and labelled triage examples |
+| `data/github_issues_golang_results.json` | The latest benchmark results, as JSON |
 | **assets/** | |
 | `assets/banner.svg`, `assets/pipeline.svg` | Animated images used in this README (original) |
 | **Project files** | |
@@ -504,7 +684,7 @@ The competition rules require naming every AI tool used. We used:
 | Tool | What it was used for |
 |---|---|
 | **OpenAI ChatGPT / Codex** | Generated most of the application code under the team's direction, and helped with brainstorming, project guidance and presentation preparation |
-| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck and the challenge brief, fixed cross-group access bugs, made task edits host-only, added code comments, the one-command and GitHub Codespaces setup, the Docker setup, and this README |
+| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck, the challenge brief and the submission rules; fixed cross-group access bugs; made task edits host-only; added the source cross-checks (PRDs, bug tickets, meeting summaries), blocker detection, bug triage, member task submissions, false-alert dismissal, decision impact and the event-log download; built the GitHub Issues benchmark and the simulated conflict-resolution tests; added code comments and lint fixes, the hosting, Codespaces and run scripts, and this README |
 
 The team chose the problem, designed the concept, the deck and the demo story, and
 directed the AI tools.
@@ -522,7 +702,14 @@ directed the AI tools.
 
 **Verified:**
 
-- 24 automated tests: privacy, host approvals, group isolation, the demo passcode, live-AI recovery and live updates.
+- 32 automated tests: privacy, host approvals, group isolation, the demo passcode,
+  live-AI recovery, live updates, and source cross-checks (PRD conflicts,
+  blockers, bug triage, duplicate bugs, task submissions, dismissals, decision
+  impact, event-log download).
+- In the browser: adding a PRD raised a contradiction quoting the PRD line and
+  both chat messages; approving it recorded a decision listing T-1 to T-4; the
+  event log downloaded as JSON; no console errors.
+- `ruff` lint passes with no findings.
 - The full demo flow: brief → host approval → tasks → new login requirement →
   alert with sources, affected tasks and hours → host resolution → QA criteria.
 - Sentence Transformers + FAISS retrieval and both evaluations (results above).
@@ -538,7 +725,7 @@ directed the AI tools.
 
 - Host resolution and QA criteria on live AI in the browser (covered in demo mode
   and by the tests).
-- The Kaggle GitHub Issues benchmark.
+- Very large documents and many simultaneous judges on the shared free-tier key.
 - More than three users, more than one group per person, and long sessions.
 
 ## ⚠️ Known limitations
@@ -562,7 +749,8 @@ directed the AI tools.
 
 ## 🔭 Future scope
 
-- Connect GitHub issues, documents and meeting-summary sources.
+- Connect GitHub issues, document tools and meeting-summary sources automatically
+  (in the prototype, sources are pasted in by hand).
 - Support larger teams and more detailed permission policies.
 - Add multilingual evaluation and improved dependency visualisation.
 - Expand beyond the prototype after measured user feedback.

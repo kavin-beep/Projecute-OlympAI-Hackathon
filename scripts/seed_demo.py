@@ -12,8 +12,8 @@ All demo text is synthetic and written for this prototype.
 """
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -93,7 +93,7 @@ def seed(full: bool = False) -> dict:
               (db.new_id(), channels[channel], gid, users[username], "user", text, ts + 10 + i))
 
     # Personal project for each member (individual workspace is private).
-    for username, uid in users.items():
+    for uid in users.values():
         db.ex("INSERT INTO projects (id, user_id, name, created_at) VALUES (?,?,?,?)",
               (db.new_id(), uid, "Checkout work", db.now()))
 

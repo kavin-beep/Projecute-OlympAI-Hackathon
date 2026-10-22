@@ -23,13 +23,13 @@ def audio_provider() -> str | None:
 
 
 def _palette(seed: str) -> list[str]:
-    """Pick two colours from the prompt so each placeholder image looks different."""
+    """Pick four related colours from the prompt so each placeholder image looks different."""
     h = int(hashlib.sha256(seed.encode()).hexdigest()[:8], 16)
     base = (h % 360) / 360
     out = []
     for i in range(4):
         r, g, b = colorsys.hsv_to_rgb((base + i * 0.08) % 1.0, 0.55, 0.45 + i * 0.12)
-        out.append("#%02x%02x%02x" % (int(r * 255), int(g * 255), int(b * 255)))
+        out.append(f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}")
     return out
 
 

@@ -7,11 +7,10 @@ falls back to TF-IDF vectors with numpy cosine similarity. The behaviour of
 """
 from __future__ import annotations
 
-import math
 import re
 import threading
 from collections import Counter
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -156,7 +155,7 @@ def related(
             cvecs = _embed(texts)
             qvec = _embed([query])
             scores, idxs = _faiss_search(cvecs, qvec, k)
-            out = [(ids[i], float(s)) for s, i in zip(scores[0], idxs[0]) if i != -1]
+            out = [(ids[i], float(s)) for s, i in zip(scores[0], idxs[0], strict=True) if i != -1]
             return [(i, s) for i, s in out if s >= min_score]
         except Exception:
             pass  # fall through to TF-IDF

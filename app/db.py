@@ -10,7 +10,8 @@ import sqlite3
 import threading
 import time
 import uuid
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 DB_PATH = os.environ.get(
     "PROJECUTE_DB",
@@ -171,14 +172,34 @@ CREATE TABLE IF NOT EXISTS decisions (
     created_at REAL NOT NULL
 );
 
+-- Sources the team adds for the agents to cross-check: PRDs, bug tickets and
+-- meeting summaries. Each is split into statements ("claims") for retrieval.
+CREATE TABLE IF NOT EXISTS documents (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,                   -- prd | bug | meeting
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    user_id TEXT REFERENCES users(id),
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS document_claims (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    text TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
     id TEXT PRIMARY KEY,
     group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL,                   -- duplicate | contradiction | assumption | unclear
+    kind TEXT NOT NULL,                   -- duplicate | contradiction | assumption | unclear | blocker
     severity TEXT NOT NULL DEFAULT 'medium',
     headline TEXT NOT NULL,
     explanation TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open',  -- open | resolved
+    status TEXT NOT NULL DEFAULT 'open',  -- open | resolved | dismissed
     resolution TEXT,
     resolved_by TEXT REFERENCES users(id),
     options TEXT,                         -- JSON list of plain-language resolution options
@@ -190,6 +211,15 @@ CREATE TABLE IF NOT EXISTS alert_sources (
     alert_id TEXT NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
     message_id TEXT NOT NULL REFERENCES group_messages(id) ON DELETE CASCADE,
     PRIMARY KEY (alert_id, message_id)
+);
+
+-- Evidence that is not a chat message: a statement from a source document,
+-- or an existing task that a bug ticket duplicates.
+CREATE TABLE IF NOT EXISTS alert_evidence (
+    alert_id TEXT NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
+    ref_kind TEXT NOT NULL,               -- claim | ticket
+    ref_id TEXT NOT NULL,
+    PRIMARY KEY (alert_id, ref_kind, ref_id)
 );
 
 CREATE TABLE IF NOT EXISTS alert_tickets (

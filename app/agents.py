@@ -17,11 +17,13 @@ from .llm import llm
 from .retrieval import related, similarity
 from .schemas import (
     AcceptanceCriteria,
+    ArchitectBatch,
     ArchitectVerdict,
+    BlockerList,
     BriefDraft,
     FuturesComparison,
-    TicketProposal,
     TicketSet,
+    TriageResult,
     UnitTestVerdict,
 )
 
@@ -98,9 +100,9 @@ def heuristic_verdict(a: str, b: str) -> ArchitectVerdict:
         return ArchitectVerdict(
             kind="contradiction",
             severity="high",
-            headline=f"These two messages disagree about {topic}",
+            headline=f"These statements disagree about {topic}",
             explanation=(
-                f"One message says {topic} is not needed, the other says it is required. "
+                f"One side says {topic} is not needed, the other says it is required. "
                 "The team has to pick one before work continues."
             ),
             options=[
@@ -227,9 +229,10 @@ def _mock_tickets(brief_text: str, messages: list[dict]) -> dict:
     picks: list[str] = []
     for s in sentences:
         low = s.lower()
-        if any(v in low for v in verbs) and not low.startswith(("what", "why", "how", "do we", "should we")):
-            if not any(similarity(s, p) > 0.75 for p in picks):
-                picks.append(s)
+        reads_like_work = any(v in low for v in verbs) and not low.startswith(
+            ("what", "why", "how", "do we", "should we"))
+        if reads_like_work and not any(similarity(s, p) > 0.75 for p in picks):
+            picks.append(s)
     picks = picks[:6] or sentences[:3]
     tickets = []
     for s in picks:
@@ -298,8 +301,17 @@ def propose_tickets(brief_text: str, messages: list[dict], members: list[str]) -
 # Architect agent
 # ---------------------------------------------------------------------------
 ARCHITECT_SYSTEM = (
-    "You are the Architect agent. You compare two statements made by a project team and decide "
-    "whether they are a duplicate, a contradiction, an assumption mismatch, or unclear. "
+    "You are the Architect agent. You compare statements made by a project team and label each pair:\n"
+    "- contradiction: opposite rules: one says something is required, allowed or needed, the other "
+    "says it is not (e.g. 'login is required' vs 'no login').\n"
+    "- assumption: both accept the same thing but assume different values or details: numbers, "
+    "limits, durations, sizes, versions (e.g. 'keep orders 30 days' vs 'keep orders 90 days').\n"
+    "- duplicate: the same piece of work or the same problem described in different words.\n"
+    "- unclear: about the same thing, but you cannot tell whether they conflict; a person should read them.\n"
+    "- none: unrelated, or consistent with each other.\n"
+    "Rule: when both statements agree something exists but give different numbers or amounts for it "
+    "(days, sizes, limits, counts, minutes, characters), the label is assumption, never contradiction.\n"
+    "Severity: contradiction high, assumption medium, duplicate and unclear low. "
     "Write for a reader who is not technical. Never mention models, embeddings or thresholds."
 )
 
@@ -316,6 +328,36 @@ def architect_check(claim_a: str, claim_b: str) -> tuple[ArchitectVerdict, str]:
         ),
         mock=lambda: heuristic_verdict(claim_a, claim_b).model_dump(),
     )
+
+
+def architect_check_batch(pairs: list[tuple[str, str]]) -> list[tuple[ArchitectVerdict, str]]:
+    """Architect agent on several pairs in one call (slide 11: batch to respect API limits).
+
+    The model numbers its verdicts; if any pair is missing from the answer, that
+    pair falls back to its own single call, so every pair always gets a verdict.
+    """
+    if len(pairs) <= 1:
+        return [architect_check(a, b) for a, b in pairs]
+    listing = "\n\n".join(f"Pair {i}:\nStatement A: {a}\nStatement B: {b}" for i, (a, b) in enumerate(pairs, 1))
+
+    def mock() -> dict:
+        return {"verdicts": [{**heuristic_verdict(a, b).model_dump(), "pair": i}
+                             for i, (a, b) in enumerate(pairs, 1)]}
+
+    batch, src = llm.structured(
+        ArchitectBatch,
+        system=ARCHITECT_SYSTEM,
+        user=(f"{listing}\n\nFor every pair, decide: duplicate, contradiction, assumption (people assumed "
+              "different things), unclear, or none. Return one verdict per pair with its pair number, a short "
+              "headline, a plain explanation, and 2-3 resolution options."),
+        mock=mock,
+    )
+    by_pair = {v.pair: v for v in batch.verdicts}
+    out: list[tuple[ArchitectVerdict, str]] = []
+    for i, (a, b) in enumerate(pairs, 1):
+        v = by_pair.get(i)
+        out.append((ArchitectVerdict(**v.model_dump(exclude={"pair"})), src) if v else architect_check(a, b))
+    return out
 
 
 def find_related(claim: str, corpus: list[tuple[str, str]], k: int = 4,
@@ -417,6 +459,105 @@ def compare_interpretations(ticket_title: str, creator_desc: str, assignee_desc:
 
 
 # ---------------------------------------------------------------------------
+# Source documents: PRDs, bug tickets and meeting summaries
+# ---------------------------------------------------------------------------
+_HEADING = re.compile(r"^\s*(?:#{1,6}\s|[A-Z][A-Za-z ]{0,40}:\s*$)")
+_BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+
+
+def split_claims(text: str, limit: int = 25) -> list[str]:
+    """Split a document into short statements the agents can compare one by one.
+
+    Lines and bullets become statements; long lines are split into sentences.
+    Headings, questions and fragments too short to mean anything are skipped.
+    """
+    claims: list[str] = []
+    for line in text.splitlines():
+        if not line.strip() or _HEADING.match(line):
+            continue
+        line = _BULLET.sub("", line).strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", line):
+            sentence = sentence.strip(" -•")
+            if len(sentence) >= 20 and not sentence.endswith("?") and sentence not in claims:
+                claims.append(sentence)
+    return claims[:limit]
+
+
+_BLOCKER_CUE = re.compile(
+    r"\b(?:block(?:ed|s|ing|er)?|waiting (?:on|for)|can(?:'|no)?t (?:start|continue|ship|merge|deploy)"
+    r"|depends on|until .{3,40} (?:is|are) (?:done|ready|fixed|approved)|stuck|no access|not available"
+    r"|on hold|delayed)\b", re.I)
+
+
+def _mock_blockers(text: str) -> dict:
+    """Demo-mode blocker finder: statements with blocking cue words."""
+    found = []
+    for claim in split_claims(text, limit=60):
+        if _BLOCKER_CUE.search(claim):
+            found.append({"statement": claim, "blocks": "",
+                          "explanation": "This statement says work cannot go ahead until something else happens."})
+    return {"blockers": found[:5]}
+
+
+def detect_blockers(kind: str, title: str, text: str) -> tuple[BlockerList, str]:
+    """PM agent: find blockers (things stopping or delaying planned work) in a source document."""
+    return llm.structured(
+        BlockerList,
+        system=("You are the PM agent. You read a team's project document and list only real blockers: "
+                "things that stop or delay planned work (missing access, waiting on another team or decision, "
+                "a dependency that is not ready, an open bug that prevents release). Quote the blocking "
+                "statement exactly as written. If there are none, return an empty list. Plain language."),
+        user=f"Document type: {kind}\nTitle: {title}\n\n{text}\n\nList the blockers.",
+        mock=lambda: _mock_blockers(text),
+    )
+
+
+_BUG_WORDS = re.compile(r"\b(?:bug|error|crash|fail(?:s|ed|ing)?|broken|exception|wrong|cannot|can't|doesn'?t work|500|404)\b", re.I)
+_FEATURE_WORDS = re.compile(r"\b(?:feature|add|support|allow|request|would like|should be able|enhance|improve)\b", re.I)
+_QUESTION_WORDS = re.compile(r"\b(?:how (?:do|can|to)|is it possible|question|help|why does)\b", re.I)
+_DOCS_WORDS = re.compile(r"\b(?:docs?|documentation|readme|typo|examples?|tutorial|godoc|clarify|wording)\b", re.I)
+_URGENT_WORDS = re.compile(r"\b(?:crash|data loss|security|urgent|critical|production|all users|blocker|cannot (?:log ?in|pay|checkout))\b", re.I)
+
+
+def _mock_triage(title: str, body: str) -> dict:
+    """Demo-mode triage: keyword rules for category and priority.
+
+    The title is the strongest signal, so it is read before the body.
+    """
+    text = f"{title}\n{body}"
+    title_bug = _BUG_WORDS.search(title)
+    title_feature = _FEATURE_WORDS.search(title) or re.match(r"\s*(?:\S+:\s*)?proposal\b", title, re.I)
+    if _DOCS_WORDS.search(title):
+        category = "docs"
+    elif _QUESTION_WORDS.search(title) or title.strip().endswith("?"):
+        category = "question"
+    elif title_feature and not title_bug:
+        category = "feature"
+    elif title_bug or _BUG_WORDS.search(body):
+        category = "bug"
+    elif _FEATURE_WORDS.search(body):
+        category = "feature"
+    else:
+        category = "bug"
+    priority = "High" if _URGENT_WORDS.search(text) else ("Low" if category in ("docs", "question") else "Medium")
+    hours = {"High": 6.0, "Medium": 4.0, "Low": 2.0}[priority]
+    return {"category": category, "priority": priority, "estimated_hours": hours,
+            "summary": _short(title or body, 120)}
+
+
+def triage_issue(title: str, body: str) -> tuple[TriageResult, str]:
+    """PM agent: triage a bug ticket or issue into category, priority and an hour estimate."""
+    return llm.structured(
+        TriageResult,
+        system=("You are the PM agent triaging an incoming issue for a software team. Choose the category "
+                "(bug, feature, question or docs), a priority (Low, Medium or High: High only for crashes, "
+                "data loss, security or anything that stops users), an estimate in hours, and a one-line summary."),
+        user=f"Title: {title}\n\n{body[:3000]}",
+        mock=lambda: _mock_triage(title, body),
+    )
+
+
+# ---------------------------------------------------------------------------
 # LangGraph pipelines
 # ---------------------------------------------------------------------------
 class PlanState(TypedDict, total=False):
@@ -481,8 +622,9 @@ def _node_architect(state: ReviewState) -> ReviewState:
     """Graph node: ask the Architect about each related claim and keep the most serious issue."""
     corpus = dict(state["corpus"])
     best: dict[str, Any] | None = None
-    for mid, score in state.get("matches", []):
-        verdict, src = architect_check(state["claim"], corpus[mid])
+    matches = state.get("matches", [])
+    verdicts = architect_check_batch([(state["claim"], corpus[mid]) for mid, _ in matches])
+    for (mid, score), (verdict, src) in zip(matches, verdicts, strict=True):
         if verdict.kind == "none":
             continue
         rank = {"contradiction": 3, "assumption": 2, "duplicate": 1, "unclear": 0}[verdict.kind]
@@ -515,4 +657,110 @@ def run_review_pipeline(claim: str, corpus: list[tuple[str, str]]) -> ReviewStat
         return _review_graph.invoke(state)
     state.update(_node_retrieve(state))
     state.update(_node_architect(state))
+    return state
+
+
+# ---- Source review: PRDs, bug tickets and meeting summaries -------------------
+MAX_SOURCE_CHECKS = 8     # Architect calls per document, to stay inside free-tier rate limits
+
+
+class SourceState(TypedDict, total=False):
+    kind: str                         # prd | bug | meeting
+    title: str
+    text: str
+    corpus: list[tuple[str, str]]     # (prefixed id, text): chat, other documents, tasks
+    duplicate_targets: list[str]      # corpus ids a bug ticket may duplicate
+    claims: list[str]
+    pairs: list[tuple[str, str, float]]
+    findings: list[dict]
+    blockers: list[dict]
+    triage: dict
+
+
+def _source_min_score() -> float:
+    """Embeddings and TF-IDF score on different scales, so the retrieval cut-off depends on the backend."""
+    from .retrieval import backend
+    return 0.45 if backend() == "embeddings" else 0.2
+
+
+def _node_split(state: SourceState) -> SourceState:
+    """Graph node: split the document into statements."""
+    return {"claims": split_claims(state["text"])}
+
+
+def _node_source_retrieve(state: SourceState) -> SourceState:
+    """Graph node: pair each statement with its closest earlier statements, strongest pairs first."""
+    pairs: list[tuple[str, str, float]] = []
+    for claim in state.get("claims", []):
+        for match_id, score in find_related(claim, state["corpus"], k=2, min_score=_source_min_score()):
+            pairs.append((claim, match_id, score))
+    pairs.sort(key=lambda p: -p[2])
+    return {"pairs": pairs[:MAX_SOURCE_CHECKS]}
+
+
+def _node_source_architect(state: SourceState) -> SourceState:
+    """Graph node: the Architect checks each pair and keeps one finding per statement.
+
+    Conflicts are always kept. Duplicates count only for bug tickets, and only
+    against ids listed in `duplicate_targets` (other bug reports and fix tasks),
+    because a bug in a feature is not a duplicate of the feature.
+    """
+    corpus = dict(state["corpus"])
+    targets = set(state.get("duplicate_targets", []))
+    by_claim: dict[str, dict] = {}
+    pairs = state.get("pairs", [])
+    verdicts = architect_check_batch([(claim, corpus[match_id]) for claim, match_id, _ in pairs])
+    for (claim, match_id, score), (verdict, src) in zip(pairs, verdicts, strict=True):
+        if verdict.kind == "duplicate" and not (state["kind"] == "bug" and match_id in targets):
+            continue
+        if verdict.kind not in ("contradiction", "assumption", "duplicate"):
+            continue
+        if claim in by_claim:                    # same statement, more evidence
+            by_claim[claim]["match_ids"].append(match_id)
+        else:
+            by_claim[claim] = {**verdict.model_dump(), "claim": claim, "match_ids": [match_id],
+                               "score": score, "source": src}
+    return {"findings": list(by_claim.values())}
+
+
+def _node_blockers(state: SourceState) -> SourceState:
+    """Graph node: the PM agent lists blockers in the document."""
+    found, _ = detect_blockers(state["kind"], state["title"], state["text"])
+    return {"blockers": [b.model_dump() for b in found.blockers]}
+
+
+def _node_triage(state: SourceState) -> SourceState:
+    """Graph node: the PM agent triages a bug ticket (category, priority, hours)."""
+    if state["kind"] != "bug":
+        return {"triage": {}}
+    result, _ = triage_issue(state["title"], state["text"])
+    return {"triage": result.model_dump()}
+
+
+_source_graph = None
+if HAS_LANGGRAPH:
+    _s = StateGraph(SourceState)
+    _s.add_node("split", _node_split)
+    _s.add_node("retrieve", _node_source_retrieve)
+    _s.add_node("architect", _node_source_architect)
+    _s.add_node("pm_blockers", _node_blockers)
+    _s.add_node("pm_triage", _node_triage)
+    _s.set_entry_point("split")
+    _s.add_edge("split", "retrieve")
+    _s.add_edge("retrieve", "architect")
+    _s.add_edge("architect", "pm_blockers")
+    _s.add_edge("pm_blockers", "pm_triage")
+    _s.add_edge("pm_triage", END)
+    _source_graph = _s.compile()
+
+
+def run_source_review(kind: str, title: str, text: str, corpus: list[tuple[str, str]],
+                      duplicate_targets: list[str] | None = None) -> SourceState:
+    """Cross-check a PRD, bug ticket or meeting summary against the chat, other sources and tasks."""
+    state: SourceState = {"kind": kind, "title": title, "text": text, "corpus": corpus,
+                          "duplicate_targets": duplicate_targets or []}
+    if _source_graph is not None:
+        return _source_graph.invoke(state)
+    for node in (_node_split, _node_source_retrieve, _node_source_architect, _node_blockers, _node_triage):
+        state.update(node(state))
     return state

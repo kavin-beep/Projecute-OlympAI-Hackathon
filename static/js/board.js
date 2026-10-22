@@ -1,10 +1,11 @@
-// Group workspace: Brief, Tasks, Decisions, Alerts, Activity, Team outputs.
+// Group workspace: Brief, Sources, Tasks, Decisions, Alerts, Activity, Team outputs.
 
 import { api, on, state } from './api.js';
 import { $, clear, codeBlock, el, emptyState, icon, markdown, modal, relative, skeleton, timeOf, toast } from './ui.js';
 
 const SECTIONS = [
   ['brief', 'Brief', 'doc'],
+  ['sources', 'Sources', 'work'],
   ['tickets', 'Tasks', 'board'],
   ['decisions', 'Decisions', 'check'],
   ['alerts', 'Alerts', 'alert'],
@@ -28,7 +29,7 @@ export async function loadBoard() {
   renderSection();
 }
 
-// Draw the six workspace sections with their count badges.
+// Draw the workspace sections with their count badges.
 function renderNav() {
   const nav = clear($('#boardNav'));
   nav.append(el('div', { class: 'sectionlabel' }, 'Shared with the team'));
@@ -53,8 +54,93 @@ function heading(title, sub, action) {
 // Render whichever workspace section is selected.
 function renderSection() {
   const body = clear($('#boardBody'));
-  ({ brief: renderBrief, tickets: renderTickets, decisions: renderDecisions,
+  ({ brief: renderBrief, sources: renderSources, tickets: renderTickets, decisions: renderDecisions,
      alerts: renderAlerts, activity: renderActivity, outputs: renderOutputs })[section](body);
+}
+
+// ---------------------------------------------------------------- sources
+const SOURCE_KINDS = [
+  ['prd', 'PRD', 'Product requirements: what to build and the rules it must follow.'],
+  ['bug', 'Bug ticket', 'A problem someone found. The PM agent triages it into a task.'],
+  ['meeting', 'Meeting summary', 'Notes from a stand-up or sprint meeting. Blockers are flagged.'],
+];
+
+// Sources section: PRDs, bug tickets and meeting summaries the agents cross-check.
+function renderSources(body) {
+  const w = state.workspace;
+  const add = el('button', { class: 'btn primary' }, icon('plus', 15), 'Add a source');
+  add.addEventListener('click', addSourceDialog);
+  body.append(heading('Sources',
+    'PRDs, bug tickets and meeting summaries. The Architect agent checks every statement against the chat, '
+    + 'the other sources and the tasks; the PM agent flags blockers and triages bugs.', add));
+  if (!w.documents.length) {
+    body.append(emptyState({
+      art: 'doc', title: 'No sources yet',
+      text: 'Paste a PRD, a bug ticket or a meeting summary. Conflicts, duplicates and blockers show up under Alerts, with the exact statements quoted.',
+      actionLabel: 'Add a source', onAction: addSourceDialog,
+    }));
+    return;
+  }
+  for (const d of w.documents) {
+    const card = el('div', { class: 'card itemcard' });
+    card.append(el('div', { class: 'cardhead' },
+      el('span', { class: 'kindtag' }, d.label), el('h4', {}, d.title),
+      el('span', { class: 'spacer', style: 'flex:1' }),
+      el('span', { class: `sev ${d.flags ? 'high' : 'ok'}` }, icon(d.flags ? 'alert' : 'check', 12),
+        d.flags ? `${d.flags} flag${d.flags > 1 ? 's' : ''}` : 'No issues')));
+    card.append(el('div', { class: 'meta' }, `Added by ${d.added_by || 'someone'} · ${relative(d.created_at)}`));
+    card.append(el('div', { class: 'meta truncate', style: 'margin-top:6px' }, d.content.slice(0, 160)));
+    card.addEventListener('click', () => openDocument(d.id));
+    body.append(card);
+  }
+}
+
+// Dialog to add a PRD, bug ticket or meeting summary.
+function addSourceDialog() {
+  const kind = el('select', { class: 'field' });
+  for (const [value, label] of SOURCE_KINDS) kind.append(el('option', { value }, label));
+  const hint = el('div', { class: 'meta', style: 'margin-top:4px' }, SOURCE_KINDS[0][2]);
+  kind.addEventListener('change', () => { hint.textContent = SOURCE_KINDS.find((k) => k[0] === kind.value)[2]; });
+  const title = el('input', { class: 'field', placeholder: 'e.g. Checkout PRD v2' });
+  const text = el('textarea', { class: 'field', style: 'min-height:220px',
+    placeholder: 'Paste the document. One statement per line or bullet works best.' });
+  modal({
+    title: 'Add a source for the agents to check',
+    body: el('div', {},
+      el('div', { class: 'row' }, el('label', {}, 'Type'), kind, hint),
+      el('div', { class: 'row' }, el('label', {}, 'Title'), title),
+      el('div', { class: 'row' }, el('label', {}, 'Text'), text)),
+    confirmLabel: 'Add and check',
+    onConfirm: async () => {
+      if (!title.value.trim() || text.value.trim().length < 20) {
+        toast('Add a title and at least a sentence of text.', 'err');
+        return false;
+      }
+      toast('The agents are checking it…');
+      try {
+        const { alerts } = await api(`/groups/${state.group.group.id}/documents`, {
+          method: 'POST', body: { kind: kind.value, title: title.value.trim(), content: text.value.trim() } });
+        toast(alerts.length ? `${alerts.length} flag${alerts.length > 1 ? 's' : ''} raised — see Alerts` : 'Checked. Nothing conflicts.',
+          alerts.length ? 'err' : undefined);
+      } catch (err) { toast(err.message, 'err'); return false; }
+    },
+  });
+}
+
+// Open a source document: its text and the flags it raised.
+async function openDocument(id) {
+  try {
+    const { document: d } = await api(`/groups/${state.group.group.id}/documents/${id}`);
+    const box = el('div', {});
+    box.append(el('div', { class: 'row-between', style: 'margin-bottom:10px' },
+      el('span', { class: 'kindtag' }, d.label), el('span', { class: 'spacer' }),
+      el('span', { class: 'meta' }, `${d.added_by || 'Someone'} · ${relative(d.created_at)}`)));
+    box.append(el('div', { class: 'card flat', style: 'white-space:pre-wrap' }, d.content));
+    box.append(el('h4', { style: 'margin:14px 0 6px' },
+      d.alerts.length ? `Flags from this source (${d.alerts.length})` : 'No flags from this source'));
+    for (const a of d.alerts) box.append(alertCard(a, true));
+    openSide(d.title, box);
+  } catch (err) { toast(err.message, 'err'); }
 }
 
 // ---------------------------------------------------------------- brief
@@ -251,6 +337,9 @@ function renderTickets(body) {
   const w = state.workspace;
   const proposed = w.tickets.filter((t) => t.status === 'proposed');
   const action = el('div', { class: 'row-between' });
+  const add = el('button', { class: 'btn' }, icon('plus', 15), 'New task');
+  add.addEventListener('click', newTaskDialog);
+  action.append(add);
   if (proposed.length && state.group.is_host) {
     const ok = el('button', { class: 'btn primary' }, icon('check', 15), `Approve ${proposed.length} assignment${proposed.length > 1 ? 's' : ''}`);
     ok.addEventListener('click', async () => {
@@ -276,6 +365,39 @@ function renderTickets(body) {
     return;
   }
   for (const t of w.tickets) body.append(ticketRow(t));
+}
+
+// Dialog for any member to submit a task; it waits for the host and is checked for duplicates.
+function newTaskDialog() {
+  const title = el('input', { class: 'field', placeholder: 'What needs doing' });
+  const detail = el('textarea', { class: 'field', style: 'min-height:90px', placeholder: 'Details (optional)' });
+  const pri = el('select', { class: 'field' });
+  for (const p of ['Low', 'Medium', 'High']) pri.append(el('option', { value: p }, p));
+  pri.value = 'Medium';
+  const hours = el('input', { class: 'field', type: 'number', min: '0.5', step: '0.5', value: '4' });
+  const owner = el('select', { class: 'field' });
+  owner.append(el('option', { value: '' }, 'Let the host assign it'));
+  for (const m of state.group.members) owner.append(el('option', { value: m.id }, m.display_name));
+  modal({
+    title: 'New task',
+    body: el('div', {},
+      el('p', { class: 'meta' }, 'The host approves new tasks. The Architect agent checks it is not a duplicate of an existing one.'),
+      el('div', { class: 'row' }, el('label', {}, 'Task'), title),
+      el('div', { class: 'row' }, el('label', {}, 'Details'), detail),
+      el('div', { class: 'row' }, el('label', {}, 'Priority'), pri),
+      el('div', { class: 'row' }, el('label', {}, 'Estimated hours'), hours),
+      el('div', { class: 'row' }, el('label', {}, 'Suggested owner'), owner)),
+    confirmLabel: 'Submit task',
+    onConfirm: async () => {
+      if (!title.value.trim()) { toast('Give the task a title.', 'err'); return false; }
+      try {
+        await api(`/groups/${state.group.group.id}/tickets`, { method: 'POST', body: {
+          title: title.value.trim(), detail: detail.value.trim(), priority: pri.value,
+          estimated_hours: Number(hours.value), owner_user_id: owner.value || null } });
+        toast('Task submitted for the host to approve');
+      } catch (err) { toast(err.message, 'err'); return false; }
+    },
+  });
 }
 
 // Round to one decimal place.
@@ -441,21 +563,24 @@ function renderAlerts(body) {
 
 const KIND_TEXT = {
   duplicate: 'Looks like the same task',
-  contradiction: 'These two messages disagree',
+  contradiction: 'These statements disagree',
   assumption: 'People assumed different things',
   unclear: 'Needs a person to look',
+  blocker: 'Something is blocking work',
 };
 
 // One alert: source messages, affected tasks, impact and resolution options.
 export function alertCard(a, compact = false) {
-  const card = el('div', { class: `alert ${a.severity}${a.status === 'resolved' ? ' resolved' : ''}` });
+  const closed = a.status !== 'open';
+  const card = el('div', { class: `alert ${a.severity}${closed ? ' resolved' : ''}` });
   card.append(el('div', { class: 'strip' }));
   const body = el('div', { class: 'alertbody' });
 
   body.append(el('div', { class: 'kindrow' },
-    el('span', { class: `sev ${a.status === 'resolved' ? 'ok' : a.severity}` },
-      icon(a.status === 'resolved' ? 'check' : 'alert', 12),
-      a.status === 'resolved' ? 'Resolved' : KIND_TEXT[a.kind] || 'Flagged'),
+    el('span', { class: `sev ${closed ? 'ok' : a.severity}` },
+      icon(closed ? 'check' : 'alert', 12),
+      a.status === 'resolved' ? 'Resolved' : a.status === 'dismissed' ? 'Dismissed as a false alert'
+        : KIND_TEXT[a.kind] || 'Flagged'),
     el('span', { class: 'spacer', style: 'flex:1' }),
     el('span', { class: 'meta' }, relative(a.created_at))));
 
@@ -466,10 +591,19 @@ export function alertCard(a, compact = false) {
     const ev = el('div', { class: 'evidence' });
     for (const s of a.sources) {
       const q = el('div', { class: 'quote' },
-        el('div', { class: 'qhead' }, s.author || 'Someone', el('span', {}, timeOf(s.created_at)), icon('reply', 11)),
+        el('div', { class: 'qhead' }, s.author || 'Someone', el('span', {}, timeOf(s.created_at)),
+          icon(s.kind === 'message' ? 'reply' : s.kind === 'ticket' ? 'board' : 'doc', 11)),
         el('div', { class: 'qtext' }, s.content));
-      q.title = 'Open this message in the group chat';
-      q.addEventListener('click', () => gotoChannelMessage && gotoChannelMessage(s.id));
+      if (s.kind === 'document') {
+        q.title = 'Open this source document';
+        q.addEventListener('click', () => openDocument(s.document_id));
+      } else if (s.kind === 'ticket') {
+        q.title = 'Open this task';
+        q.addEventListener('click', () => openTicket(s.ticket));
+      } else {
+        q.title = 'Open this message in the group chat';
+        q.addEventListener('click', () => gotoChannelMessage && gotoChannelMessage(s.id));
+      }
       ev.append(q);
     }
     body.append(ev);
@@ -488,9 +622,9 @@ export function alertCard(a, compact = false) {
   }
   body.append(impact);
 
-  if (a.status === 'resolved') {
+  if (closed) {
     body.append(el('div', { class: 'card flat', style: 'padding:0' },
-      el('div', { class: 'meta' }, `Decided by ${a.resolved_by_name || 'the host'}`),
+      el('div', { class: 'meta' }, `${a.status === 'dismissed' ? 'Dismissed' : 'Decided'} by ${a.resolved_by_name || 'the host'}`),
       el('p', { style: 'margin:4px 0 0' }, a.resolution)));
   } else if (state.group.is_host) {
     let picked = null;
@@ -518,7 +652,16 @@ export function alertCard(a, compact = false) {
         toast('Resolution approved. Everyone\'s dashboard is updated.');
       } catch (err) { toast(err.message, 'err'); approve.disabled = false; }
     });
-    body.append(approve);
+    // False alerts are closed without a decision (slide 11: evidence, "unclear", human review).
+    const dismiss = el('button', { class: 'btn ghost', style: 'margin:12px 0 0 8px' }, 'Dismiss as a false alert');
+    dismiss.addEventListener('click', async () => {
+      dismiss.disabled = true;
+      try {
+        await api(`/groups/${state.group.group.id}/alerts/${a.id}/dismiss`, { method: 'POST', body: {} });
+        toast('Dismissed. No decision was recorded.');
+      } catch (err) { toast(err.message, 'err'); dismiss.disabled = false; }
+    });
+    body.append(approve, dismiss);
   } else {
     body.append(el('div', { class: 'meta' }, 'Waiting for the host to approve a resolution.'));
   }
@@ -544,6 +687,19 @@ function renderDecisions(body) {
     card.append(el('div', { class: 'cardhead' }, icon('check', 15), el('h4', {}, d.title),
       el('span', { class: 'meta' }, relative(d.created_at))));
     card.append(el('p', {}, d.content));
+    if (d.tickets?.length) {         // decision impact: the dependent tasks it changed
+      const chips = el('span', { class: 'chips' });
+      for (const t of d.tickets) {
+        const chip = el('button', { class: 'chip' }, t.key);
+        chip.title = t.title;
+        chip.addEventListener('click', () => {
+          const full = state.workspace.tickets.find((x) => x.id === t.id);
+          if (full) openTicket(full);
+        });
+        chips.append(chip);
+      }
+      card.append(el('div', { class: 'impact' }, el('span', { class: 'meta' }, 'Tasks this decision changes'), chips));
+    }
     const foot = el('div', { class: 'row-between' }, el('span', { class: 'meta' }, `Approved by ${d.decided_by_name}`));
     if (d.alert_id) {
       const link = el('button', { class: 'btn sm ghost' }, 'See the messages behind it');
@@ -561,7 +717,9 @@ function renderDecisions(body) {
 // ---------------------------------------------------------------- activity
 function renderActivity(body) {
   const w = state.workspace;
-  body.append(heading('Activity', 'What each agent and person did, newest first.'));
+  const download = el('button', { class: 'btn' }, icon('copy', 14), 'Download event log');
+  download.addEventListener('click', downloadEventLog);
+  body.append(heading('Activity', 'What each agent and person did, newest first.', download));
   if (!w.activity.length) {
     body.append(emptyState({ art: 'clock', title: 'Nothing has happened yet', text: 'Agent and host actions are logged here as they happen.' }));
     return;
@@ -593,6 +751,20 @@ function renderActivity(body) {
     line.append(row);
   }
   body.append(line);
+}
+
+// Save the full multi-agent event stream as a JSON file.
+async function downloadEventLog() {
+  try {
+    const res = await fetch(`/api/groups/${state.group.group.id}/activity/export`, { headers: { 'X-Token': state.token } });
+    if (!res.ok) throw new Error('Could not download the event log.');
+    const url = URL.createObjectURL(await res.blob());
+    const a = el('a', { href: url, download: 'projecute-event-log.json' });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) { toast(err.message, 'err'); }
 }
 
 // ---------------------------------------------------------------- outputs
@@ -644,7 +816,7 @@ export function initBoardLive() {
     renderNav();
     renderSection();
   };
-  for (const ev of ['brief', 'tickets', 'alert', 'alerts', 'decisions', 'activity', 'outputs', 'futures', 'unit_tests']) {
+  for (const ev of ['brief', 'documents', 'tickets', 'alert', 'alerts', 'decisions', 'activity', 'outputs', 'futures', 'unit_tests']) {
     on(`ws:${ev}`, async ({ group_id }) => {
       if (!state.group || group_id !== state.group.group.id) return;
       await refresh();

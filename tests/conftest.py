@@ -10,7 +10,6 @@ os.environ.setdefault("PROJECUTE_DB", os.path.join(tempfile.mkdtemp(prefix="proj
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import db  # noqa: E402
 from app.main import app  # noqa: E402
 from scripts.seed_demo import seed  # noqa: E402
 
