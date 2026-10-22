@@ -27,6 +27,11 @@ from collections import Counter
 REPO = "golang/go"
 API = "https://api.github.com"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "github_issues_golang.json")
+ATTRIBUTION = (
+    "Issue titles, bodies, labels and links from the public github.com/golang/go issue tracker, "
+    "collected through GitHub's public API. The text belongs to the people who wrote those issues; "
+    "it is used here only to evaluate the Projecute prototype. Duplicate links are the Go "
+    "maintainers' own 'Duplicate of #N' comments.")
 DUP_RE = re.compile(r"(?i)\bduplicate of (?:golang/go)?#(\d+)")
 TRIAGE_QUERIES = {          # label -> what the PM agent's triage should say
     "FeatureRequest": "feature",
@@ -76,7 +81,8 @@ def _load() -> dict:
     if os.path.exists(OUT):
         with open(OUT, encoding="utf-8") as fh:
             return json.load(fh)
-    return {"source": f"https://github.com/{REPO}/issues", "pairs": [], "triage": [], "checked": []}
+    return {"source": f"https://github.com/{REPO}/issues", "attribution": ATTRIBUTION,
+            "pairs": [], "triage": [], "checked": []}
 
 
 def _save(data: dict) -> None:

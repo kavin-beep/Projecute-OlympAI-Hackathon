@@ -1,5 +1,6 @@
 {
  "source": "https://github.com/golang/go/issues",
+ "attribution": "Issue titles, bodies, labels and links from the public github.com/golang/go issue tracker, collected through GitHub's public API. The text belongs to the people who wrote those issues; it is used here only to evaluate the Projecute prototype. Duplicate links are the Go maintainers' own 'Duplicate of #N' comments.",
  "pairs": [
   {
    "duplicate": {
