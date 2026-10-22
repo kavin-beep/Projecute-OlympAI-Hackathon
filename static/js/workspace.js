@@ -118,8 +118,8 @@ export async function openItem(itemId) {
   if (item.generator === 'mock' && (item.kind === 'image' || item.kind === 'audio')) {
     card.append(el('div', { class: 'meta', style: 'margin-bottom:10px;color:var(--medium)' },
       item.kind === 'image'
-        ? 'Demo mode — placeholder image. Add an image provider key to generate real images.'
-        : 'Demo mode — your browser reads the script aloud. Add an audio provider key for generated speech.'));
+        ? 'Placeholder image. Real image generation will be enhanced and added in future development.'
+        : 'Your browser reads the script aloud. Real audio generation will be enhanced and added in future development.'));
   }
 
   if (item.kind === 'image') {
