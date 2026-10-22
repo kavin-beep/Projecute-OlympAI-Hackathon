@@ -14,8 +14,37 @@
   <img alt="FAISS" src="https://img.shields.io/badge/Sentence%20Transformers-FAISS-4FE0A8">
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-storage-003B57?logo=sqlite&logoColor=white">
   <img alt="Tests" src="https://img.shields.io/badge/tests-23%20passed-2EA44F">
-  <img alt="Hugging Face" src="https://img.shields.io/badge/demo-Hugging%20Face%20Spaces-FFD21E?logo=huggingface&logoColor=black">
+  <img alt="Runs in GitHub Codespaces" src="https://img.shields.io/badge/runs%20in-GitHub%20Codespaces-24292F?logo=github&logoColor=white">
 </p>
+
+---
+
+## 🚀 Quick start for judges
+
+**No API key needed:** the full demo works out of the box in labelled demo mode.
+Pick whichever is easiest:
+
+| Option | Steps | Time |
+|---|---|---|
+| **A. In your browser (nothing to install)** | Click the button below → **Create codespace**. The app installs and opens by itself. | ~3–5 min the first time |
+| **B. Windows** | Install [Python 3.11+](https://www.python.org/downloads/) (tick *Add python.exe to PATH*), unzip, double-click **`run.bat`** | ~5 min the first time |
+| **C. macOS / Linux** | Unzip, then run `bash run.sh` in a terminal | ~5 min the first time |
+
+<p align="center">
+  <a href="https://codespaces.new/kavin-beep/Projecute-OlympAI-Hackathon?quickstart=1">
+    <img src="https://github.com/codespaces/badge.svg" alt="Open in GitHub Codespaces">
+  </a>
+</p>
+
+Then open the app in **two browser tabs**. Sign in as **Kavin K** (the host) in
+one and **Sritharan N S** in the other, and follow the
+[two-minute demo](#-two-minute-demo-script).
+
+> **Want the live AI agents?** Get a free key at
+> [console.groq.com/keys](https://console.groq.com/keys) (about a minute, no
+> payment). In Codespaces, paste it as `GROQ_API_KEY` on the *Create codespace*
+> page. Locally, put it in the `.env` file the run script creates. The header
+> shows **Live AI** or **Demo mode**, so you always know which you're seeing.
 
 ---
 
@@ -27,7 +56,7 @@
 4. [How it works](#-how-it-works-the-agent-pipeline)
 5. [Data and evaluation](#-data-and-evaluation)
 6. [Setup and installation](#-setup-and-installation)
-7. [Running the main code](#-running-the-main-code)
+7. [Running the main code](#-running-the-main-code) and [troubleshooting](#-troubleshooting)
 8. [Two-minute demo script](#-two-minute-demo-script)
 9. [Every file and its purpose](#-every-file-and-its-purpose)
 10. [Dependencies](#-dependencies)
@@ -242,6 +271,10 @@ The CSV needs one labelled pair per row: `text_a,text_b,is_duplicate` (or
 **Requirements:** Python 3.11 or newer, and about 2 GB of disk space for
 PyTorch and the embedding model.
 
+The easiest way is `run.bat` (Windows) or `bash run.sh` (macOS/Linux): each one
+creates a virtual environment, installs everything once, creates `.env`, starts
+the app and opens your browser. To do the same by hand:
+
 ```bash
 git clone https://github.com/kavin-beep/Projecute-OlympAI-Hackathon.git
 cd Projecute-OlympAI-Hackathon
@@ -287,16 +320,29 @@ automatically.
 | `DEMO_PASSCODE` | *(empty)* | When set, **Load demo** asks for it before resetting |
 | `PROJECUTE_DB` | `data/projecute.db` | SQLite database file |
 
-### Hosted demo (Hugging Face Spaces, Docker)
+### Run with Docker (optional)
 
-The same app runs unchanged in a Docker container on Hugging Face Spaces, and
-live updates over WebSockets keep working. The API key is stored as a **Space
-secret**, never in the files.
+The same app runs unchanged in a container on any Docker host, and live updates
+over WebSockets keep working. Pass the API key as an environment variable or a
+host secret, never in the files. `deploy/huggingface/README.md` holds the page
+settings for a Hugging Face Docker Space, which needs a paid Hugging Face plan.
 
 ```bash
 docker build -t projecute .
 docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one projecute
 ```
+
+## 🩺 Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `python` is not recognised (Windows) | Reinstall Python 3.11+ and tick **Add python.exe to PATH**, then open a new terminal |
+| The page doesn't load right away | The first start downloads and loads the AI embedding model; wait about a minute. `run.bat` / `bash run.sh` open the browser when it's ready |
+| `Address already in use` / port 8000 busy | Start on another port: `PORT=8010 python main.py` (Windows: `set PORT=8010` then `python main.py`) |
+| Header says **Demo mode** | No Groq key is set. Add one to `.env` (or the Codespaces secret) and restart; see Quick start |
+| No internet on first run | The app still starts and uses the TF-IDF search fallback; Settings → Advanced shows which search is active |
+| Want a clean demo again | Press **Load demo** on the sign-in screen, or run `python -m scripts.seed_demo` |
+| Codespace stopped after being idle | Reopen it from github.com/codespaces; the app starts again by itself |
 
 ---
 
@@ -326,7 +372,10 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 
 | File | Purpose |
 |---|---|
-| `main.py` | **Main entry point.** Starts the web server (`python main.py`); reads `HOST` and `PORT` |
+| `main.py` | **Main entry point.** Starts the web server (`python main.py`); reads `HOST`, `PORT` and `OPEN_BROWSER` |
+| `run.bat` | One-command start for Windows: virtual environment, one-time install, `.env`, start, open browser |
+| `run.sh` | The same one-command start for macOS and Linux |
+| `.devcontainer/devcontainer.json` | GitHub Codespaces setup: installs dependencies, starts the app, opens it, and offers an optional `GROQ_API_KEY` secret |
 | **app/** | **Backend (Python)** |
 | `app/__init__.py` | Marks `app` as a Python package |
 | `app/main.py` | FastAPI application: every HTTP endpoint for the four areas, sign-in, permission checks (member, host, same group), server-sent events for streamed chat, the WebSocket endpoint and the static frontend |
@@ -369,9 +418,10 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 | `requirements.txt` | Python dependencies |
 | `.env.example` | Template for `.env` (no real keys) |
 | `.gitignore` | Keeps `.env`, the database and caches out of git |
+| `.gitattributes` | Keeps Windows line endings in `run.bat` and Unix line endings in `run.sh` |
 | `Dockerfile` | Container image for Hugging Face Spaces or any Docker host |
 | `.dockerignore` | Keeps `.env` and local data out of the image |
-| `deploy/huggingface/README.md` | The Hugging Face Space's page and settings (uploaded as the Space's README) |
+| `deploy/huggingface/README.md` | Page settings for an optional Hugging Face Docker Space (needs a paid Hugging Face plan) |
 | `README.md` | This document |
 
 ---
@@ -426,7 +476,7 @@ The competition rules require naming every AI tool used. We used:
 | Tool | What it was used for |
 |---|---|
 | **OpenAI ChatGPT / Codex** | Generated most of the application code under the team's direction, and helped with brainstorming, project guidance and presentation preparation |
-| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck and the challenge brief, fixed cross-group access bugs, made task edits host-only, added code comments, the Docker and Hugging Face setup, and this README |
+| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck and the challenge brief, fixed cross-group access bugs, made task edits host-only, added code comments, the one-command and GitHub Codespaces setup, the Docker setup, and this README |
 
 The team chose the problem, designed the concept, the deck and the demo story, and
 directed the AI tools.
@@ -471,8 +521,8 @@ directed the AI tools.
   skips questions. **Alerts → Check the chat again** re-scans everything.
 - **Images and audio are placeholders** without a media provider key, labelled
   in the interface.
-- **SQLite, single process.** Fine for a demo. On the free Hugging Face tier the
-  data resets when the Space restarts.
+- **SQLite, single process.** Fine for a demo, not for many concurrent teams.
+  In a Docker container the data resets when the container is recreated.
 - **A provider error that can't be retried switches to demo mode** until
   restart, and the header shows it.
 
