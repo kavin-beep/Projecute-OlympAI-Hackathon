@@ -275,8 +275,10 @@ server enforces this, not just the interface, and tests cover it.
 - Answers are **cached**. Architect checks are **batched**: the related pairs
   for one message or document go to the model in a single call, and any pair
   missing from the reply falls back to its own call. Rate limits and timeouts are
-  retried with **exponential backoff**. Together, as slide 11 promises, these
-  keep the free tier usable.
+  retried with **exponential backoff**. If the main model (`gpt-oss-120b`) hits a
+  Groq rate limit, the app switches at once to the backup model (`gpt-oss-20b`),
+  which has its own limits, and chat answers use light reasoning to save tokens.
+  Together, as slide 11 promises, these keep the free tier usable.
 - With an API key the app always stays in **live mode** (the live site never shows
   Demo mode). If the AI service still fails after the retries, chat replies ask you
   to try again, and an agent step uses the built-in rules for that one step.
@@ -448,7 +450,8 @@ automatically.
 | Variable | Default | Purpose |
 |---|---|---|
 | `GROQ_API_KEY` | *(empty)* | Enables live AI; empty means demo mode |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Groq model; tested with `openai/gpt-oss-120b` |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Main AI model (OpenAI open-weight, served by Groq) |
+| `GROQ_FALLBACK_MODEL` | `openai/gpt-oss-20b` | Backup model used automatically when the main one hits a Groq rate limit |
 | `HOST` / `PORT` | `127.0.0.1` / `8000` | Where the server listens |
 | `DEMO_PASSCODE` | *(empty)* | When set, **Load demo** asks for it before resetting |
 | `PROJECUTE_DB` | `data/projecute.db` | SQLite database file |
@@ -637,7 +640,7 @@ directed the AI tools.
 
 | Model | Purpose |
 |---|---|
-| Groq-hosted LLM (`openai/gpt-oss-120b`, configurable) | PM, Architect and QA agents; chat answers; workspace generation |
+| OpenAI `gpt-oss-120b` on Groq (main), with `gpt-oss-20b` as automatic backup | PM, Architect and QA agents; chat answers; workspace generation |
 | `sentence-transformers/all-MiniLM-L6-v2` | Embeddings for related-claim retrieval |
 
 ---
@@ -779,7 +782,7 @@ libraries are installed from `requirements.txt` and are not bundled in it.
 |---|---|---|
 | [`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | Embeddings for related-claim search | Apache-2.0 |
 | [`openai/gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b), served by [Groq](https://groq.com) | PM, Architect and QA agents in live mode | Apache-2.0 model; Groq API terms |
-| `llama-3.3-70b-versatile` (Groq, only if `GROQ_MODEL` is not set) | Default model | Llama 3.3 Community License; Groq API terms |
+| [`openai/gpt-oss-20b`](https://huggingface.co/openai/gpt-oss-20b), served by Groq | Automatic backup when the main model hits a rate limit | Apache-2.0 model; Groq API terms |
 
 **Fonts, images and services**
 

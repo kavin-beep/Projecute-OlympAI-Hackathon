@@ -17,6 +17,8 @@ services:
         value: 0.0.0.0
       - key: GROQ_MODEL
         value: openai/gpt-oss-120b
+      - key: GROQ_FALLBACK_MODEL
+        value: openai/gpt-oss-20b
       - key: GROQ_API_KEY        # your Groq key: turns on live AI for every visitor
         sync: false
       - key: DEMO_PASSCODE       # protects "Load demo" from visitors

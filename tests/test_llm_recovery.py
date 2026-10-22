@@ -71,3 +71,39 @@ def test_agent_steps_use_the_rules_for_that_step_and_stay_live(monkeypatch):
                                     mock=lambda: {"criteria": ["rule-based criterion"]})
     assert result.criteria == ["rule-based criterion"] and source == "rules"
     assert llm.mode == "live"
+
+
+class RateLimitError(Exception):
+    """Stands in for Groq's rate-limit error (daily or per-minute)."""
+
+
+class MainModelLimitedClient:
+    """The main model is out of daily tokens; the backup model answers."""
+
+    def __init__(self) -> None:
+        self.models: list[str] = []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+
+    def create(self, **kwargs):
+        self.models.append(kwargs["model"])
+        if kwargs["model"] == "openai/gpt-oss-120b":
+            raise RateLimitError("Rate limit reached on tokens per day (TPD). Please try again in 3m20.016s.")
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="backup answer"))])
+
+
+def test_a_rate_limited_main_model_switches_to_the_backup_at_once(monkeypatch):
+    slept: list[float] = []
+    monkeypatch.setattr(llm_module.time, "sleep", slept.append)
+    llm = LLM()
+    llm.model, llm.fallback_model = "openai/gpt-oss-120b", "openai/gpt-oss-20b"
+    client = MainModelLimitedClient()
+    llm._client = client
+    question = [{"role": "user", "content": "hi"}]
+
+    assert llm.complete(question, cache=False) == "backup answer"
+    assert client.models == ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+    assert slept == []                                   # no waiting: the backup was free
+
+    client.models.clear()
+    assert llm.complete(question, cache=False) == "backup answer"
+    assert client.models == ["openai/gpt-oss-20b"]       # remembers the main model is limited for ~3 min

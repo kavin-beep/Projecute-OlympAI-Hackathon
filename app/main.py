@@ -296,9 +296,11 @@ async def send_chat_message(chat_id: str, payload: dict = Body(...), user: dict 
             yield _sse({"type": "delta", "text": piece})
         answer = "".join(chunks)
         amid = db.new_id()
-        db.ex("INSERT INTO chat_messages (id, chat_id, role, content, created_at) VALUES (?,?,?,?,?)",
-              (amid, chat_id, "assistant", answer, db.now()))
-        db.ex("UPDATE chats SET updated_at=? WHERE id=?", (db.now(), chat_id))
+        # The chat may have been deleted while the answer was streaming; then there is nothing to save.
+        if db.q1("SELECT 1 FROM chats WHERE id=?", (chat_id,)):
+            db.ex("INSERT INTO chat_messages (id, chat_id, role, content, created_at) VALUES (?,?,?,?,?)",
+                  (amid, chat_id, "assistant", answer, db.now()))
+            db.ex("UPDATE chats SET updated_at=? WHERE id=?", (db.now(), chat_id))
         yield _sse({"type": "done", "id": amid, "content": answer})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
