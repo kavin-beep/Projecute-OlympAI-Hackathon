@@ -2,6 +2,9 @@
 
 Every structured call is validated with Pydantic and retried; responses are
 cached and rate limits are handled with exponential backoff.
+With a key configured the app always stays in live mode: if the provider still
+fails after the retries, chat replies ask the user to try again and agent steps
+use the built-in rules for that one step. Demo mode is only for runs without a key.
 The API key is never printed, logged or returned to the client.
 """
 from __future__ import annotations
@@ -21,9 +24,15 @@ from pydantic import BaseModel, ValidationError
 T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
-MAX_RETRIES = 3
-RETRY_LIVE_AFTER = 30   # seconds of demo answers after a provider error before trying live AI again
+MAX_RETRIES = 3          # attempts to get JSON that validates
+TRANSPORT_RETRIES = 5    # attempts per provider call (rate limits, timeouts), with backoff
 CACHE_MAX = 512
+BUSY_MESSAGE = ("Projecute AI couldn't reach the AI service just now. "
+                "Please send your message again in a moment.")
+
+
+class AIUnavailable(Exception):
+    """The live AI service could not be reached after every retry."""
 
 
 def _load_dotenv() -> None:
@@ -80,7 +89,6 @@ class LLM:
         self._key = os.environ.get("GROQ_API_KEY", "").strip()
         self._client = None
         self._degraded_reason: str | None = None
-        self._retry_at = 0.0          # after a provider error, live AI resumes at this time
         if self._key:
             try:
                 from groq import Groq
@@ -93,8 +101,8 @@ class LLM:
     # ---------------- status ----------------
     @property
     def mode(self) -> str:
-        """'live' when the Groq client is usable, otherwise 'mock' (demo mode)."""
-        return "live" if self._client is not None and time.time() >= self._retry_at else "mock"
+        """'live' whenever a Groq key is configured, otherwise 'mock' (demo mode, no key)."""
+        return "live" if self._client is not None else "mock"
 
     def status(self) -> dict:
         """What the header shows: live or demo mode, which model, and why it degraded."""
@@ -105,9 +113,8 @@ class LLM:
             "reason": self._degraded_reason,
         }
 
-    def _degrade(self, reason: str) -> None:
-        """Use demo answers for a short cool-down after a provider error, then try live AI again."""
-        self._retry_at = time.time() + RETRY_LIVE_AFTER
+    def _note_problem(self, reason: str) -> None:
+        """Remember the last provider problem (shown in Settings); live mode stays on."""
         self._degraded_reason = reason
 
     # ---------------- free text ----------------
@@ -120,18 +127,22 @@ class LLM:
         mock: Callable[[], str] | None = None,
         cache: bool = True,
     ) -> str:
-        """Free-text answer for a chat history, cached; uses the mock answer without a provider."""
+        """Free-text answer for a chat history, cached.
+
+        Without a key it returns the labelled demo answer. With a key it raises
+        AIUnavailable if the provider fails after every retry, so callers can ask
+        the user to try again instead of showing a demo answer.
+        """
         key = _hash(self.model, messages, temperature)
         if cache:
             hit = _cache.get(key)
             if hit is not None:
                 return hit
-        text: str | None = None
-        if self.mode == "live":
-            text = self._call_with_backoff(messages, temperature, max_tokens)
-        if text is None:
-            # Not cached, so the same question gets a live answer once the AI is back.
+        if self.mode != "live":
             return (mock or (lambda: demo_answer(_last_question(messages))))()
+        text = self._call_with_backoff(messages, temperature, max_tokens)
+        if text is None:
+            raise AIUnavailable(self._degraded_reason or "AI provider unavailable")
         if cache:
             _cache.put(key, text)
         return text
@@ -144,20 +155,37 @@ class LLM:
         max_tokens: int = 1200,
         mock: Callable[[], str] | None = None,
     ) -> Iterator[str]:
-        """Yield text chunks. Falls back to chunking a mock answer."""
+        """Yield text chunks. Without a key, chunks the labelled demo answer.
+
+        With a key, a failed stream is retried with backoff; if nothing could be
+        sent after every retry, the user is asked to try again (never a demo answer).
+        """
         if self.mode == "live":
-            try:
-                stream = self._client.chat.completions.create(
-                    model=self.model, messages=messages, temperature=temperature,
-                    max_tokens=max_tokens, stream=True,
-                )
-                for chunk in stream:
-                    piece = chunk.choices[0].delta.content or ""
-                    if piece:
-                        yield piece
-                return
-            except Exception as exc:
-                self._degrade(f"{type(exc).__name__} during streaming")
+            delay = 1.0
+            for attempt in range(TRANSPORT_RETRIES):
+                sent = False
+                try:
+                    stream = self._client.chat.completions.create(
+                        model=self.model, messages=messages, temperature=temperature,
+                        max_tokens=max_tokens, stream=True,
+                    )
+                    for chunk in stream:
+                        piece = chunk.choices[0].delta.content or ""
+                        if piece:
+                            sent = True
+                            yield piece
+                    self._degraded_reason = None
+                    return
+                except Exception as exc:
+                    self._note_problem(f"{type(exc).__name__} during streaming")
+                    if sent:                      # part of the answer is already on screen
+                        yield "\n\n_" + BUSY_MESSAGE + "_"
+                        return
+                    if attempt < TRANSPORT_RETRIES - 1:
+                        time.sleep(delay + random.random() * 0.3)
+                        delay *= 2
+            yield BUSY_MESSAGE
+            return
         text = (mock or (lambda: demo_answer(_last_question(messages))))()
         for part in re.findall(r"\S+\s*", text):
             yield part
@@ -177,7 +205,8 @@ class LLM:
         """Return (validated model, source) where source is 'live' or 'mock'.
 
         Retries on invalid JSON, feeding the validation error back to the model.
-        Falls back to the supplied mock when the provider is unavailable.
+        Without a key, or if the provider still fails after every retry, the
+        built-in rules (`mock`) decide that one step; live mode stays on.
         """
         if self.mode != "live":
             return schema.model_validate(mock()), "mock"
@@ -201,16 +230,16 @@ class LLM:
                     {"role": "user", "content": f"That did not validate: {last_error}\nReturn corrected JSON only."},
                 ]
         if last_error:
-            self._degraded_reason = "AI output failed validation; using demo response"
-        return schema.model_validate(mock()), "mock"
+            self._note_problem("AI output failed validation; built-in rules used for one step")
+        return schema.model_validate(mock()), "rules"
 
     # ---------------- transport ----------------
     def _call_with_backoff(
         self, messages: list[dict], temperature: float, max_tokens: int, json_mode: bool = False
     ) -> str | None:
         """Call Groq, retrying rate limits and timeouts with exponential backoff."""
-        delay = 0.8
-        for attempt in range(MAX_RETRIES):
+        delay = 1.0
+        for attempt in range(TRANSPORT_RETRIES):
             try:
                 kwargs: dict[str, Any] = dict(
                     model=self.model, messages=messages,
@@ -224,11 +253,11 @@ class LLM:
             except Exception as exc:
                 name = type(exc).__name__
                 retryable = "RateLimit" in name or "Timeout" in name or "APIConnection" in name or "InternalServer" in name
-                if retryable and attempt < MAX_RETRIES - 1:
+                if retryable and attempt < TRANSPORT_RETRIES - 1:
                     time.sleep(delay + random.random() * 0.3)
                     delay *= 2
                     continue
-                self._degrade(f"{name} from the AI provider")
+                self._note_problem(f"{name} from the AI provider")
                 return None
         return None
 

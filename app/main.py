@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import agents, db, media, pipeline, retrieval
-from .llm import llm
+from .llm import BUSY_MESSAGE, AIUnavailable, llm
 from .ws import hub
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -385,24 +385,27 @@ async def generate_item(payload: dict = Body(...), user: dict = User) -> dict:
         chat_id = None
 
     body, language, data_url, generator = "", None, None, "live"
-    if kind in ("content", "email", "code"):
-        body = await asyncio.to_thread(
-            llm.complete,
-            [{"role": "system", "content": ITEM_PROMPTS[kind]}, {"role": "user", "content": prompt}],
-        )
-        generator = llm.mode
-        if kind == "code":
-            language = payload.get("language") or "python"
-    elif kind == "image":
-        data_url, generator = media.generate_image(prompt, name)
-        body = prompt
-    else:
-        script = await asyncio.to_thread(
-            llm.complete,
-            [{"role": "system", "content": "Write a short spoken script, 60 words max, plain text only."},
-             {"role": "user", "content": prompt}],
-        )
-        body, generator = media.generate_audio(script)
+    try:
+        if kind in ("content", "email", "code"):
+            body = await asyncio.to_thread(
+                llm.complete,
+                [{"role": "system", "content": ITEM_PROMPTS[kind]}, {"role": "user", "content": prompt}],
+            )
+            generator = llm.mode
+            if kind == "code":
+                language = payload.get("language") or "python"
+        elif kind == "image":
+            data_url, generator = media.generate_image(prompt, name)
+            body = prompt
+        else:
+            script = await asyncio.to_thread(
+                llm.complete,
+                [{"role": "system", "content": "Write a short spoken script, 60 words max, plain text only."},
+                 {"role": "user", "content": prompt}],
+            )
+            body, generator = media.generate_audio(script)
+    except AIUnavailable as exc:      # never save a half-made item; ask the user to try again
+        raise HTTPException(503, BUSY_MESSAGE) from exc
 
     iid = db.new_id()
     ts = db.now()
@@ -572,12 +575,7 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
 
     if ai_mode == "private":
         # Nothing about the prompt, the answer or the topic reaches the group.
-        context = _group_context(group_id)
-        answer = await asyncio.to_thread(
-            llm.complete,
-            [{"role": "system", "content": GROUP_AI_SYSTEM},
-             {"role": "user", "content": f"Group messages so far:\n{context}\n\nQuestion: {content}"}],
-        )
+        answer = await _group_answer(group_id, content)
         hid = db.new_id()
         ts = db.now()
         db.ex("INSERT INTO private_help (id, group_id, channel_id, user_id, prompt, answer, created_at)"
@@ -601,12 +599,7 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
     result["message"] = msg
 
     if ai_mode == "public":
-        context = _group_context(group_id)
-        answer = await asyncio.to_thread(
-            llm.complete,
-            [{"role": "system", "content": GROUP_AI_SYSTEM},
-             {"role": "user", "content": f"Group messages so far:\n{context}\n\nQuestion: {content}"}],
-        )
+        answer = await _group_answer(group_id, content)
         aid = db.new_id()
         db.ex("INSERT INTO group_messages (id, channel_id, group_id, user_id, kind, content, reply_to_id, created_at)"
               " VALUES (?,?,?,?,?,?,?,?)", (aid, channel_id, group_id, None, "ai_public", answer, mid, db.now()))
@@ -622,6 +615,19 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
         if alert:
             result["alert"] = alert
     return result
+
+
+async def _group_answer(group_id: str, question: str) -> str:
+    """The group assistant's answer, or a polite 'try again' if the AI service is unavailable."""
+    context = _group_context(group_id)
+    try:
+        return await asyncio.to_thread(
+            llm.complete,
+            [{"role": "system", "content": GROUP_AI_SYSTEM},
+             {"role": "user", "content": f"Group messages so far:\n{context}\n\nQuestion: {question}"}],
+        )
+    except AIUnavailable:
+        return BUSY_MESSAGE
 
 
 def _group_context(group_id: str) -> str:
