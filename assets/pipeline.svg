@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-labelledby="t d">
+  <title id="t">Projecute agent pipeline</title>
+  <desc id="d">PM agent drafts the brief and tickets, the host approves, retrieval and the Architect agent check new messages, the host resolves flags, and the QA agent writes acceptance criteria. Every step is pushed live to all dashboards.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10z" fill="#4FE0A8"/>
+    </marker>
+    <style>
+      .box   { fill: #141C36; stroke: #2A3560; stroke-width: 1.5 }
+      .agent { fill: #12261F; stroke: #4FE0A8; stroke-width: 1.5 }
+      .human { fill: #2A2140; stroke: #B79CFF; stroke-width: 1.5 }
+      .h     { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #E7ECF8 }
+      .p     { font: 400 13px 'Segoe UI', Arial, sans-serif; fill: #99A6C7 }
+      .lbl   { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #6C7A9C; letter-spacing: 1.5px }
+      .edge  { stroke: #4FE0A8; stroke-width: 2; fill: none; stroke-dasharray: 6 6; animation: dash 1.2s linear infinite; marker-end: url(#arrow) }
+      @keyframes dash { to { stroke-dashoffset: -24 } }
+      .step  { opacity: 0.35; animation: lit 10s infinite }
+      .s1 { animation-delay: 0s } .s2 { animation-delay: 1.66s } .s3 { animation-delay: 3.33s }
+      .s4 { animation-delay: 5s } .s5 { animation-delay: 6.66s } .s6 { animation-delay: 8.33s }
+      @keyframes lit { 0% { opacity: 0.35 } 4% { opacity: 1 } 16% { opacity: 1 } 22% { opacity: 0.35 } 100% { opacity: 0.35 } }
+      .live  { animation: blink 1.4s ease-in-out infinite }
+      @keyframes blink { 50% { opacity: 0.25 } }
+    </style>
+  </defs>
+
+  <rect width="1200" height="420" rx="20" fill="#0B1020"/>
+  <text class="lbl" x="40" y="44">HOW IT WORKS · AGENTS (GREEN) PROPOSE · THE HOST (PURPLE) DECIDES</text>
+
+  <!-- row 1 -->
+  <g class="step s1"><rect class="box" x="40" y="72" width="230" height="110" rx="14"/>
+    <text class="h" x="60" y="106">1 · Team chat</text>
+    <text class="p" x="60" y="132">Members discuss in channels.</text>
+    <text class="p" x="60" y="152">Private AI help stays private.</text></g>
+  <g class="step s2"><rect class="agent" x="330" y="72" width="250" height="110" rx="14"/>
+    <text class="h" x="350" y="106">2 · PM agent</text>
+    <text class="p" x="350" y="132">Drafts the brief, then tickets:</text>
+    <text class="p" x="350" y="152">task · priority · hours · owner</text></g>
+  <g class="step s3"><rect class="human" x="640" y="72" width="230" height="110" rx="14"/>
+    <text class="h" x="660" y="106">3 · Host approves</text>
+    <text class="p" x="660" y="132">Brief, assignments and</text>
+    <text class="p" x="660" y="152">AI access need the host.</text></g>
+  <g class="step s4"><rect class="agent" x="930" y="72" width="230" height="110" rx="14"/>
+    <text class="h" x="950" y="106">4 · Architect agent</text>
+    <text class="p" x="950" y="132">Embeddings + FAISS find</text>
+    <text class="p" x="950" y="152">related claims; checks meaning.</text></g>
+
+  <path class="edge" d="M272 127 H326"/>
+  <path class="edge" d="M582 127 H636"/>
+  <path class="edge" d="M872 127 H926"/>
+  <path class="edge" d="M1045 184 V230 H880"/>
+
+  <!-- row 2 -->
+  <g class="step s5"><rect class="human" x="640" y="215" width="236" height="110" rx="14"/>
+    <text class="h" x="660" y="249">5 · Alert → host resolves</text>
+    <text class="p" x="660" y="275">Shows both source messages,</text>
+    <text class="p" x="660" y="295">affected tasks and hours.</text></g>
+  <g class="step s6"><rect class="agent" x="330" y="215" width="250" height="110" rx="14"/>
+    <text class="h" x="350" y="249">6 · QA agent</text>
+    <text class="p" x="350" y="275">Writes acceptance criteria</text>
+    <text class="p" x="350" y="295">for every affected task.</text></g>
+  <g><rect class="box" x="40" y="215" width="230" height="110" rx="14"/>
+    <text class="h" x="60" y="249">Live dashboards</text>
+    <text class="p" x="60" y="275">WebSockets push each step</text>
+    <text class="p" x="60" y="295">to every member's window.</text></g>
+
+  <path class="edge" d="M638 270 H584"/>
+  <path class="edge" d="M328 270 H274"/>
+
+  <circle class="live" cx="52" cy="370" r="6" fill="#4FE0A8"/>
+  <text class="p" x="68" y="375">Every agent action is logged in the Activity stream with a timestamp, and runs in labelled demo mode when no AI key is set.</text>
+</svg>

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-labelledby="t d">
+  <title id="t">Projecute</title>
+  <desc id="d">From team discussion to approved project work. Animated banner: chat messages flow into a brief, tasks and alerts.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#121A33"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.2" cy="0.35" r="0.6">
+      <stop offset="0" stop-color="#4FE0A8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#4FE0A8" stop-opacity="0"/>
+    </radialGradient>
+    <style>
+      .title { font: 700 64px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; fill: #E7ECF8; letter-spacing: -1px; }
+      .tag   { font: 400 22px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; fill: #99A6C7; }
+      .chip  { font: 600 15px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; fill: #E7ECF8; }
+      .small { font: 500 13px 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; fill: #6C7A9C; letter-spacing: 2px; }
+      .fade  { }
+      .d1 { animation-delay: 0.2s } .d2 { animation-delay: 0.6s } .d3 { animation-delay: 1.0s }
+      .d4 { animation-delay: 1.4s } .d5 { animation-delay: 1.8s } .d6 { animation-delay: 2.2s }
+      @keyframes in { from { opacity: 0 } to { opacity: 1 } }
+      .dot { fill: #4FE0A8; animation: flow 3.2s linear infinite; }
+      .dot.b { animation-delay: 1.07s } .dot.c { animation-delay: 2.13s }
+      @keyframes flow { 0% { transform: translateX(0); opacity: 0 } 10% { opacity: 1 } 90% { opacity: 1 } 100% { transform: translateX(420px); opacity: 0 } }
+      .pulse { animation: pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.18); opacity: 0.6 } }
+      .caret { animation: blink 1s steps(1) infinite; fill: #4FE0A8 }
+      @keyframes blink { 50% { opacity: 0 } }
+    </style>
+  </defs>
+
+  <rect width="1200" height="300" rx="22" fill="url(#bg)"/>
+  <rect width="1200" height="300" rx="22" fill="url(#glow)"/>
+
+  <!-- logo -->
+  <g class="fade d1" transform="translate(60 62) scale(2.6)">
+    <rect width="32" height="32" rx="9" fill="#0B1020" stroke="#4FE0A8" stroke-opacity="0.35"/>
+    <path d="M8 23.5 15 8.5" stroke="#4FE0A8" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M24 23.5 17 8.5" stroke="#4FE0A8" stroke-width="2.6" stroke-linecap="round" opacity="0.45"/>
+    <circle cx="16" cy="6.2" r="2.6" fill="#4FE0A8"/>
+  </g>
+
+  <text class="title fade d1" x="160" y="122">Projecute</text>
+  <text class="tag fade d2" x="162" y="160">From team discussion to approved project work<tspan class="caret">▌</tspan></text>
+  <text class="small fade d2" x="162" y="196">OLYMPAI HACKATHON · TEAM MONARCH CORE · MULTIPLAYER AI SPRINT &amp; ARCHITECTURE MANAGER</text>
+
+  <!-- flow: chat -> brief -> tasks -> alert -->
+  <g transform="translate(160 228)">
+    <line x1="40" y1="0" x2="900" y2="0" stroke="#4FE0A8" stroke-opacity="0.25" stroke-width="2" stroke-dasharray="4 8"/>
+    <g transform="translate(40 0)">
+      <circle class="dot"   r="5"/>
+      <circle class="dot b" r="5"/>
+      <circle class="dot c" r="5"/>
+    </g>
+    <g transform="translate(460 0)">
+      <circle class="dot"   r="5"/>
+      <circle class="dot b" r="5"/>
+      <circle class="dot c" r="5"/>
+    </g>
+  </g>
+
+  <g class="fade d3" transform="translate(150 210)">
+    <rect width="150" height="38" rx="19" fill="#18213F" stroke="#4FE0A8" stroke-opacity="0.4"/>
+    <text class="chip" x="75" y="24" text-anchor="middle">💬 Team chat</text>
+  </g>
+  <g class="fade d4" transform="translate(440 210)">
+    <rect width="150" height="38" rx="19" fill="#18213F" stroke="#4FE0A8" stroke-opacity="0.4"/>
+    <text class="chip" x="75" y="24" text-anchor="middle">📝 PM brief</text>
+  </g>
+  <g class="fade d5" transform="translate(730 210)">
+    <rect width="150" height="38" rx="19" fill="#18213F" stroke="#4FE0A8" stroke-opacity="0.4"/>
+    <text class="chip" x="75" y="24" text-anchor="middle">✅ Tasks</text>
+  </g>
+  <g class="fade d6" transform="translate(1000 210)">
+    <g class="pulse">
+      <rect width="172" height="38" rx="19" fill="#3A1D2A" stroke="#FF7A90" stroke-opacity="0.7"/>
+      <text class="chip" x="86" y="24" text-anchor="middle">⚠️ Conflict alert</text>
+    </g>
+  </g>
+</svg>

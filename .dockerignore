@@ -1,0 +1,11 @@
+# Never copy secrets or local data into the image.
+.env
+data/*.db
+data/*.db-wal
+data/*.db-shm
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.git/
+.claude/

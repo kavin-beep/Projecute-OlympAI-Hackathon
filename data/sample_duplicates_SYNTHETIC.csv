@@ -1,0 +1,17 @@
+text_a,text_b,is_duplicate
+"Checkout page crashes when the cart is empty","Empty cart causes the checkout page to crash",1
+"Add a dark theme to the settings screen","Settings screen should offer a dark theme option",1
+"Login button does nothing on Safari","The login button is unresponsive in Safari",1
+"Order confirmation email is never sent","Customers do not receive the order confirmation email",1
+"Allow guests to check out without an account","Support guest checkout so shoppers need no account",1
+"Search results load slowly on large catalogues","Search is slow when the catalogue is large",1
+"Store each order so support can look it up","Save every order so the support team can find it later",1
+"Add two-factor authentication for admins","Admins should have two-factor authentication enabled",1
+"Checkout page crashes when the cart is empty","Add a dark theme to the settings screen",0
+"Login button does nothing on Safari","Order confirmation email is never sent",0
+"Allow guests to check out without an account","Search results load slowly on large catalogues",0
+"Store each order so support can look it up","Add two-factor authentication for admins",0
+"Write the privacy policy page","Fix the broken image on the pricing page",0
+"Add a dark theme to the settings screen","Translate the help centre into Spanish",0
+"Rotate the API signing keys every quarter","Send a weekly sales summary to the team",0
+"Improve the onboarding tour for new users","Reduce the size of the product image bundle",0

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projecute — from team discussion to approved project work</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<!-- sign in -->
+<div class="gate" id="gate">
+  <div class="box">
+    <div class="brandbig">
+      <img src="/static/logo.svg" width="34" height="34" alt="">
+      Projecute
+    </div>
+    <p>From team discussion to approved project work. Pick who you are — open a second window and pick someone else to see both sides live.</p>
+    <div id="gateList" class="stack"></div>
+    <div class="divider"></div>
+    <button class="btn wide" id="gateDemo">Load demo</button>
+    <p class="meta" style="margin-top:12px">Loads the sample team, their chat and an approved brief. This resets the prototype's data.</p>
+  </div>
+</div>
+
+<div class="app hidden" id="app">
+  <header class="topbar">
+    <button class="iconbtn" id="btnMenu" title="Show the list" aria-label="Show the list"></button>
+    <div class="brand"><img src="/static/logo.svg" width="24" height="24" alt=""> <span class="brandname">Projecute</span></div>
+    <span class="pill" id="aiMode" title="AI provider status"><span class="dot"></span><span>Checking…</span></span>
+    <div class="spacer"></div>
+    <button class="btn sm" id="btnDemo">Load demo</button>
+    <button class="iconbtn" id="btnTheme" title="Switch theme" aria-label="Switch theme"></button>
+    <button class="iconbtn" id="btnSettings" title="Settings" aria-label="Settings"></button>
+    <button class="userchip" id="userChip"><span class="avatar" id="meAvatar"></span><span id="meName"></span></button>
+  </header>
+
+  <div class="body">
+    <nav class="rail" id="rail"></nav>
+
+    <!-- 1. Individual chat -->
+    <section class="view chat" id="view-chat">
+      <aside class="pane-list">
+        <div class="pane-head">
+          <button class="btn primary wide" id="newChat">New chat</button>
+        </div>
+        <div style="padding:10px 10px 0">
+          <div class="search">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+            <input class="field" id="chatSearch" placeholder="Search chats" aria-label="Search chats">
+          </div>
+        </div>
+        <div class="pane-scroll" id="chatList"></div>
+      </aside>
+      <main class="thread">
+        <div class="thread-head">
+          <h3 id="chatTitle" class="truncate">New chat</h3>
+          <div class="spacer" style="flex:1"></div>
+        </div>
+        <div class="thread-scroll" id="chatScroll"><div class="thread-inner" id="chatThread"></div></div>
+        <div class="composer">
+          <div class="composer-inner">
+            <div class="composer-box">
+              <textarea id="chatInput" rows="1" placeholder="Ask anything — explanations, ideas, help with learning"></textarea>
+              <button class="send" id="chatSend" aria-label="Send message"></button>
+            </div>
+            <div class="hint">Private to you. Nothing here reaches your groups unless you share it.</div>
+          </div>
+        </div>
+      </main>
+    </section>
+
+    <!-- 2. Group chat -->
+    <section class="view group" id="view-group">
+      <div class="serverrail" id="serverRail"></div>
+      <aside class="pane-list">
+        <div class="pane-head"><h3 id="groupName" class="truncate">Group</h3></div>
+        <div class="pane-scroll" id="channelList"></div>
+        <div style="padding:10px;border-top:1px solid var(--line-soft)" id="hostControls"></div>
+      </aside>
+      <main class="thread">
+        <div class="thread-head">
+          <h3 id="channelName">#channel</h3>
+          <div style="flex:1"></div>
+          <span class="meta" id="groupRole"></span>
+        </div>
+        <div class="msgs" id="groupMsgs"></div>
+        <div class="typing" id="typing"></div>
+        <div class="composer" style="padding-top:0">
+          <div class="composer-inner">
+            <div id="privateArea"></div>
+            <div class="aibar">
+              <div class="seg" id="aiSeg">
+                <button data-mode="none" class="on">Message</button>
+                <button data-mode="public">Ask the group's AI</button>
+                <button data-mode="private">Private help</button>
+              </div>
+              <span class="meta" id="aiHint"></span>
+            </div>
+            <div id="replyBar"></div>
+            <div class="composer-box">
+              <textarea id="groupInput" rows="1" placeholder="Message #checkout"></textarea>
+              <button class="send" id="groupSend" aria-label="Send message"></button>
+            </div>
+          </div>
+        </div>
+      </main>
+      <aside class="members">
+        <div class="pane-head"><h3>Members</h3></div>
+        <div class="pane-scroll" id="memberList"></div>
+      </aside>
+    </section>
+
+    <!-- 3. Individual workspace -->
+    <section class="view work" id="view-work">
+      <aside class="pane-list">
+        <div class="pane-head"><h3>Projects</h3><div style="flex:1"></div>
+          <button class="iconbtn" id="newProject" title="New project" aria-label="New project"></button>
+        </div>
+        <div style="padding:10px 10px 0">
+          <div class="search">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+            <input class="field" id="itemSearch" placeholder="Search items by name" aria-label="Search items by name">
+          </div>
+        </div>
+        <div class="pane-scroll" id="projectList"></div>
+      </aside>
+      <main class="thread">
+        <div class="thread-head">
+          <h3 id="wsChatTitle" class="truncate">Workspace chat</h3>
+          <div style="flex:1"></div>
+          <button class="btn sm" id="wsNewChat">New chat</button>
+          <button class="btn sm" id="wsTogglePanel" style="display:none">Work panel</button>
+        </div>
+        <div class="thread-scroll" id="wsScroll"><div class="thread-inner" id="wsThread"></div></div>
+        <div class="composer">
+          <div class="composer-inner">
+            <div class="composer-box">
+              <textarea id="wsInput" rows="1" placeholder="Think it through here, then turn the result into a named item"></textarea>
+              <button class="send" id="wsSend" aria-label="Send message"></button>
+            </div>
+            <div class="hint">Items you make stay private until you share them to a group.</div>
+          </div>
+        </div>
+      </main>
+      <aside class="workpanel">
+        <div class="pane-head">
+          <h3 id="wsPanelTitle">Work panel</h3><div style="flex:1"></div>
+          <button class="btn sm primary" id="newItem">New item</button>
+          <button class="btn sm ghost" id="wsBackToChat" style="display:none">Chat</button>
+        </div>
+        <div class="pane-scroll" id="itemArea"></div>
+      </aside>
+    </section>
+
+    <!-- 4. Group workspace -->
+    <section class="view board" id="view-board">
+      <aside class="pane-list">
+        <div class="pane-head"><h3 id="boardGroupName" class="truncate">Shared workspace</h3></div>
+        <div class="pane-scroll" id="boardNav"></div>
+      </aside>
+      <main class="board-main"><div class="board-inner" id="boardBody"></div></main>
+    </section>
+  </div>
+</div>
+
+<div class="sidepanel" id="sidePanel">
+  <div class="ph">
+    <h3 id="spTitle">Details</h3>
+    <button class="iconbtn" id="spClose" aria-label="Close panel"></button>
+  </div>
+  <div class="pb" id="spBody"></div>
+</div>
+
+<div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

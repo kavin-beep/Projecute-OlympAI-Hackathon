@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Projecute</title>
+  <rect width="32" height="32" rx="9" fill="#0B1020"/>
+  <path d="M8 23.5 15 8.5" stroke="#4FE0A8" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M24 23.5 17 8.5" stroke="#4FE0A8" stroke-width="2.6" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="16" cy="6.2" r="2.6" fill="#4FE0A8"/>
+</svg>
