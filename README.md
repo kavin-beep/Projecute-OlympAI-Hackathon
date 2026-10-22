@@ -142,7 +142,7 @@ deck, with where to see it.
 12. [AI tools used](#-ai-tools-used)
 13. [What was verified, and what was not](#-what-was-verified-and-what-was-not)
 14. [Known limitations](#-known-limitations)
-15. [Future scope](#-future-scope)
+15. [Future scope: what Projecute doesn't do yet](#-future-scope-what-projecute-doesnt-do-yet)
 16. [Credits and licences](#-credits-and-licences)
 17. [Team and acknowledgements](#-team-and-acknowledgements)
 
@@ -695,13 +695,54 @@ directed the AI tools.
 - **The hosted demo shares one Groq free-tier key**, so many judges at the same
   moment can hit its rate limit. Requests are retried with backoff first.
 
-## 🔭 Future scope
+## 🔭 Future scope: what Projecute doesn't do yet
 
-- Connect GitHub issues, document tools and meeting-summary sources automatically
-  (in the prototype, sources are pasted in by hand).
+Projecute is a Stage 1 prototype. This is an honest list of what it and its AI
+can't do yet, and what we plan to add. Projecute AI gives the same list when
+asked what will be improved.
+
+**Planned in our Stage 1 deck (slide 13)**
+
+- Connect GitHub issues, document tools and meeting-summary sources
+  automatically. In the prototype, sources are pasted in by hand.
 - Support larger teams and more detailed permission policies.
 - Add multilingual evaluation and improved dependency visualisation.
 - Expand beyond the prototype after measured user feedback.
+
+**Not in the prototype yet: the app**
+
+- **Teams:** only the demo team exists. Creating groups, inviting members and
+  changing the host can't be done from the app yet.
+- **Sign-in:** you pick a name. There are no passwords, accounts or password
+  reset.
+- **Sources:** text is pasted in. Uploading PDF or Word files isn't supported.
+- **Tasks:** tasks are proposed and approved, but there's no board for moving
+  them through *in progress* and *done*, no due dates, and no reminders.
+- **Notifications:** updates appear live in open windows only. There are no
+  email or phone notifications.
+- **Dependencies:** each alert lists the tasks it affects, but there's no
+  dependency graph.
+- **Image and audio:** these are labelled placeholders. Images are drawn
+  patterns, and audio is the browser reading a script aloud. Real image and
+  audio generation will be added in future development.
+- **Hosting:** the free hosted demo runs on one server with a SQLite database,
+  so its data resets when it restarts. It also uses the lighter word-matching
+  search instead of embeddings.
+
+**Not in the prototype yet: the AI**
+
+- **Autonomy:** the PM, Architect and QA agents work in a pipeline that the host
+  approves. They don't discuss with each other or act on their own.
+- **Memory:** the chat assistant remembers the last 20 messages of a
+  conversation, and nothing across separate chats.
+- **Reach:** the AI can't browse the web, read uploaded files or run code.
+- **Accuracy:** on real GitHub issues, duplicate detection is careful (no false
+  alarms in our test) but misses about 4 in 10 real duplicates, and grouping
+  whole sets of similar issues is the weakest part. Improving both is the next
+  technical step.
+- **Languages:** tested in English only.
+- **Availability:** live AI depends on the Groq free tier. If it errors or hits
+  its rate limit, answers fall back to labelled demo mode for 30 seconds.
 
 ---
 
