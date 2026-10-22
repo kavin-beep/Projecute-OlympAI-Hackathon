@@ -8,13 +8,17 @@
 </p>
 
 <p align="center">
+  <b>GitHub repository:</b> <a href="https://github.com/kavin-beep/Projecute-OlympAI-Hackathon">github.com/kavin-beep/Projecute-OlympAI-Hackathon</a><br>
+  <b>Live demo (live AI):</b> <a href="https://projecute.onrender.com">projecute.onrender.com</a>
+</p>
+
+<p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-WebSockets-009688?logo=fastapi&logoColor=white">
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-agents-1C3C3C">
   <img alt="FAISS" src="https://img.shields.io/badge/Sentence%20Transformers-FAISS-4FE0A8">
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-storage-003B57?logo=sqlite&logoColor=white">
   <img alt="Tests" src="https://img.shields.io/badge/tests-32%20passed-2EA44F">
-  <img alt="Runs in GitHub Codespaces" src="https://img.shields.io/badge/runs%20in-GitHub%20Codespaces-24292F?logo=github&logoColor=white">
 </p>
 
 ---
@@ -37,8 +41,8 @@ in **two browser tabs**, sign in as **Kavin K** (the host) in one and
 - A GitHub Action (`.github/workflows/keep-alive.yml`) pings it every 10 minutes,
   so it is awake when you click.
 - To fit the free plan's memory, related-claim search uses the TF-IDF fallback.
-  The live Architect agent still makes every conflict decision. The local and
-  Codespaces versions below use the full Sentence Transformers + FAISS search.
+  The live Architect agent still makes every conflict decision. The local
+  versions below use the full Sentence Transformers + FAISS search.
 - The data resets to the staged demo when the server restarts.
 
 </details>
@@ -50,15 +54,8 @@ live AI too. Pick whichever is easiest:
 
 | Option | Steps | Time |
 |---|---|---|
-| **A. In your browser (nothing to install)** | Click the button below → **Create codespace**. The app installs and opens by itself. | ~3–5 min the first time |
-| **B. Windows** | Install [Python 3.11+](https://www.python.org/downloads/) (tick *Add python.exe to PATH*), unzip, double-click **`run.bat`** | ~5 min the first time |
-| **C. macOS / Linux** | Unzip, then run `bash run.sh` in a terminal | ~5 min the first time |
-
-<p align="center">
-  <a href="https://codespaces.new/kavin-beep/Projecute-OlympAI-Hackathon?quickstart=1">
-    <img src="https://github.com/codespaces/badge.svg" alt="Open in GitHub Codespaces">
-  </a>
-</p>
+| **A. Windows** | Install [Python 3.11+](https://www.python.org/downloads/) (tick *Add python.exe to PATH*), unzip, double-click **`run.bat`** | ~5 min the first time |
+| **B. macOS / Linux** | Unzip, then run `bash run.sh` in a terminal | ~5 min the first time |
 
 Then open the app in **two browser tabs**. Sign in as **Kavin K** (the host) in
 one and **Sritharan N S** in the other, and follow the
@@ -66,8 +63,7 @@ one and **Sritharan N S** in the other, and follow the
 
 > **Want the live AI agents?** Get a free key at
 > [console.groq.com/keys](https://console.groq.com/keys) (about a minute, no
-> payment). In Codespaces, paste it as `GROQ_API_KEY` on the *Create codespace*
-> page. Locally, put it in the `.env` file the run script creates. The header
+> payment) and put it in the `.env` file the run script creates. The header
 > shows **Live AI** or **Demo mode**, so you always know which you're seeing.
 
 ---
@@ -91,7 +87,7 @@ deck, with where to see it.
 | 3. Conflict-detection agent flags duplicate issues or contradicting requirements across team submissions | Architect agent on chat messages, source documents and submitted tasks: duplicate / contradiction / assumption / unclear |
 | Dataset: GitHub Issues, used to benchmark clustering, de-duplication and triage | 45 real duplicate pairs and 260 labelled issues from github.com/golang/go, scored for de-duplication, search, clustering and triage: [results](#real-github-issues-benchmark) (Kaggle's copy has no duplicate labels; see why there) |
 | Target stack | Python, FastAPI + WebSockets, LangGraph, FAISS; the web UI is HTML/CSS/JS as our deck specifies |
-| Deliverable: live collaborative web dashboard | <https://projecute.onrender.com>, plus Codespaces and local options |
+| Deliverable: live collaborative web dashboard | <https://projecute.onrender.com>, plus local run scripts |
 | Deliverable: multi-agent event stream logs | **Activity** (live, timestamped) and **Download event log** (JSON) |
 | Deliverable: automated ticket generator | PM agent tickets from chat; fix tasks from bug tickets |
 | Deliverable: simulated conflict-resolution tests | `scripts/simulate_conflict_resolution.py` (18 scenarios, end to end) and `tests/` |
@@ -474,10 +470,9 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 | `python` is not recognised (Windows) | Reinstall Python 3.11+ and tick **Add python.exe to PATH**, then open a new terminal |
 | The page doesn't load right away | The first start downloads and loads the AI embedding model; wait about a minute. `run.bat` / `bash run.sh` open the browser when it's ready |
 | `Address already in use` / port 8000 busy | Start on another port: `PORT=8010 python main.py` (Windows: `set PORT=8010` then `python main.py`) |
-| Header says **Demo mode** | No Groq key is set. Add one to `.env` (or the Codespaces secret) and restart; see Quick start |
+| Header says **Demo mode** | No Groq key is set. Add one to `.env` and restart; see Quick start |
 | No internet on first run | The app still starts and uses the TF-IDF search fallback; Settings → Advanced shows which search is active |
 | Want a clean demo again | Press **Load demo** on the sign-in screen, or run `python -m scripts.seed_demo` |
-| Codespace stopped after being idle | Reopen it from github.com/codespaces; the app starts again by itself |
 
 ---
 
@@ -520,7 +515,6 @@ source** and paste any of these:
 | `main.py` | **Main entry point.** Starts the web server (`python main.py`); reads `HOST`, `PORT` and `OPEN_BROWSER` |
 | `run.bat` | One-command start for Windows: virtual environment, one-time install, `.env`, start, open browser |
 | `run.sh` | The same one-command start for macOS and Linux |
-| `.devcontainer/devcontainer.json` | GitHub Codespaces setup: installs dependencies, starts the app, opens it, and offers an optional `GROQ_API_KEY` secret |
 | `render.yaml` | Render Blueprint for the hosted live demo (free plan); the Groq key is entered in Render as a secret |
 | `requirements-render.txt` | Lighter dependency list for the hosted demo (no PyTorch, so it fits in 512 MB) |
 | `.github/workflows/keep-alive.yml` | Pings the hosted demo every 10 minutes so it never sleeps |
@@ -579,6 +573,7 @@ source** and paste any of these:
 | `.dockerignore` | Keeps `.env` and local data out of the image |
 | `deploy/huggingface/README.md` | Page settings for an optional Hugging Face Docker Space (needs a paid Hugging Face plan) |
 | `README.md` | This document |
+| `README.txt` | The same document as plain text, for reading without a Markdown viewer |
 
 ---
 
@@ -632,7 +627,7 @@ The competition rules require naming every AI tool used. We used:
 | Tool | What it was used for |
 |---|---|
 | **OpenAI ChatGPT / Codex** | Generated most of the application code under the team's direction, and helped with brainstorming, project guidance and presentation preparation |
-| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck, the challenge brief and the submission rules; fixed cross-group access bugs; made task edits host-only; added the source cross-checks (PRDs, bug tickets, meeting summaries), blocker detection, bug triage, member task submissions, false-alert dismissal, decision impact and the event-log download; built the GitHub Issues benchmark and the simulated conflict-resolution tests; added code comments and lint fixes, the hosting, Codespaces and run scripts, and this README |
+| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck, the challenge brief and the submission rules; fixed cross-group access bugs; made task edits host-only; added the source cross-checks (PRDs, bug tickets, meeting summaries), blocker detection, bug triage, member task submissions, false-alert dismissal, decision impact and the event-log download; built the GitHub Issues benchmark and the simulated conflict-resolution tests; added code comments and lint fixes, the hosting and run scripts, and this README |
 
 The team chose the problem, designed the concept, the deck and the demo story, and
 directed the AI tools.

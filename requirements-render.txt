@@ -2,7 +2,7 @@
 # PyTorch, Sentence Transformers and FAISS are left out because the embedding
 # model does not fit in that memory; related-claim search then uses the TF-IDF
 # fallback, and the live Architect agent still makes every conflict decision.
-# Local runs, Codespaces and Docker use the full requirements.txt.
+# Local runs and Docker use the full requirements.txt.
 fastapi>=0.115
 uvicorn[standard]>=0.30
 websockets>=12
