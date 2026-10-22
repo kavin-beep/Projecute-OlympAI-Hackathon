@@ -160,9 +160,12 @@ Our Stage 1 deck
   * 6
       Promise: HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence
         Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled
-        mock mode; Pydantic, retries, cache, backoff; GitHub Issues subset +
-        planted conflicts
-      Where it is met: All used; see How it works and Data and evaluation
+        mock mode; Pydantic, retries, cache, backoff; Kaggle GitHub Issues
+        subset + planted conflicts
+      Where it is met: All used, except that the GitHub issues come from
+        GitHub itself rather than Kaggle's copy, which has no duplicate
+        labels to score against (explained in Data and evaluation); see also
+        How it works
   * 7
       Promise: PM brief edited by team, approved by host; tickets with
         owner; embeddings + FAISS + Architect; flags with sources, dependent
@@ -905,7 +908,9 @@ The competition rules require naming every AI tool used. We used:
         triage, member task submissions, false-alert dismissal, decision
         impact and the event-log download; built the GitHub Issues benchmark
         and the simulated conflict-resolution tests; added code comments and
-        lint fixes, the hosting and run scripts, and this README
+        lint fixes, the hosting and run scripts, the assistant's Projecute
+        AI identity and answers about the app, and this README with its
+        credits
 
 The team chose the problem, designed the concept, the deck and the demo story,
 and directed the AI tools.
@@ -942,8 +947,9 @@ Verified:
   requirement raised a contradiction alert quoting Adrian's and Sritharan's
   messages, with "3 tasks, about 15 hours" of impact. The server used about
   100 MB of memory.
-- Earlier browser testing with two users at once: all four areas, both themes,
-  and the 390 px mobile layout.
+- Earlier browser testing with two users at once, before the Sources section
+  was added: all four areas, both themes, and the 390 px mobile layout. The
+  Sources screens were checked on desktop only.
 
 Not yet verified:
 
@@ -962,12 +968,16 @@ KNOWN LIMITATIONS
   tested.
 - Demo mode text is a fixed stand-in. It is clearly labelled. The conflict
   decisions in demo mode come from transparent text rules.
-- The TF-IDF fallback matches wording, not meaning, so it is used only when
-  the embedding model can't load.
-- Conflict review runs on new messages after the brief is approved, and skips
-  questions. Alerts → Check the chat again re-scans everything.
-- Images and audio are placeholders without a media provider key, labelled in
-  the interface.
+- The TF-IDF fallback matches wording, not meaning. It is used when the
+  embedding model can't load, and on purpose on the free hosted demo (its
+  memory is too small for the model). Local runs use Sentence Transformers +
+  FAISS.
+- Chat conflict review runs on new messages after the brief is approved, and
+  skips questions. Alerts → Check the chat again re-scans everything. Sources
+  (PRDs, bug tickets, meeting summaries) are checked as soon as they are
+  added.
+- Images and audio are labelled placeholders. Real image and audio generation
+  will be added in future development (see Future scope).
 - SQLite, single process. Fine for a demo, not for many concurrent teams. In a
   Docker container the data resets when the container is recreated.
 - After a provider error the app answers in demo mode for 30 seconds, then
@@ -1107,6 +1117,18 @@ Fonts, images and services
   * Keep-alive job
       Source: GitHub Actions
       Licence / terms: GitHub terms of service
+  * Code hosting, and the public API used to collect the benchmark issues
+      Source: GitHub (https://github.com)
+      Licence / terms: GitHub terms of service
+  * Download of the embedding model
+      Source: Hugging Face Hub (https://huggingface.co)
+      Licence / terms: Model licence above; Hugging Face terms
+  * Language runtime
+      Source: Python (https://www.python.org) 3.11+
+      Licence / terms: Python Software Foundation License
+  * Docker base image (Dockerfile)
+      Source: python:3.11-slim (https://hub.docker.com/_/python)
+      Licence / terms: Docker Official Image; Python licence
 
 Data
 
@@ -1135,7 +1157,7 @@ TEAM AND ACKNOWLEDGEMENTS
       Contribution: AI workflow, evaluation and demo preparation
 
 Thanks to the OlympAI Hackathon organisers and MethodAI, to our mentor for her
-guidance and support, and to the open-source projects listed under
-Dependencies.
+guidance and support, and to the open-source projects, models, fonts and
+services listed under Credits and licences.
 
 Projecute — from team discussion to approved project work.

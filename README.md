@@ -113,7 +113,7 @@ deck, with where to see it.
 |---|---|---|
 | 4 | Individual AI chat; reusable outputs; one shared brief and assigned tasks; expose conflicts before implementation | Individual chat, individual workspace, Brief + Tasks, Alerts |
 | 5 | Individual chat, group chat (public AI or private help with usage-only notices), individual workspace (content, emails, code as named items), group workspace; host approves assignments and group changes, including AI access | All four areas; host-only approvals and AI switches, enforced server-side |
-| 6 | HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled mock mode; Pydantic, retries, cache, backoff; GitHub Issues subset + planted conflicts | All used; see [How it works](#-how-it-works-the-agent-pipeline) and [Data and evaluation](#-data-and-evaluation) |
+| 6 | HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled mock mode; Pydantic, retries, cache, backoff; Kaggle GitHub Issues subset + planted conflicts | All used, except that the GitHub issues come from GitHub itself rather than Kaggle's copy, which has no duplicate labels to score against (explained in [Data and evaluation](#-data-and-evaluation)); see also [How it works](#-how-it-works-the-agent-pipeline) |
 | 7 | PM brief edited by team, approved by host; tickets with owner; embeddings + FAISS + Architect; flags with sources, dependent tickets, hours; host resolves; QA criteria; live dashboard | The pipeline, step by step |
 | 8 | Two-user dashboard, ticket generator, event stream; duplicate precision/recall on real issues; 15+ planted conflicts with detection and evidence; private/public access, host approvals, live updates verified | Duplicate precision/recall on 45 real GitHub pairs; 18 planted conflicts (rules and live AI); 32 tests |
 | 10 | Decision impact; each affected ticket once with team-confirmed hours; Parallel Futures; Human Unit Test; exact messages on every flag; host approves | Decisions list their tasks; impact line; Brief → Parallel Futures; task panel → Human Unit Test |
@@ -627,7 +627,7 @@ The competition rules require naming every AI tool used. We used:
 | Tool | What it was used for |
 |---|---|
 | **OpenAI ChatGPT / Codex** | Generated most of the application code under the team's direction, and helped with brainstorming, project guidance and presentation preparation |
-| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck, the challenge brief and the submission rules; fixed cross-group access bugs; made task edits host-only; added the source cross-checks (PRDs, bug tickets, meeting summaries), blocker detection, bug triage, member task submissions, false-alert dismissal, decision impact and the event-log download; built the GitHub Issues benchmark and the simulated conflict-resolution tests; added code comments and lint fixes, the hosting and run scripts, and this README |
+| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck, the challenge brief and the submission rules; fixed cross-group access bugs; made task edits host-only; added the source cross-checks (PRDs, bug tickets, meeting summaries), blocker detection, bug triage, member task submissions, false-alert dismissal, decision impact and the event-log download; built the GitHub Issues benchmark and the simulated conflict-resolution tests; added code comments and lint fixes, the hosting and run scripts, the assistant's Projecute AI identity and answers about the app, and this README with its credits |
 
 The team chose the problem, designed the concept, the deck and the demo story, and
 directed the AI tools.
@@ -661,8 +661,9 @@ directed the AI tools.
   requirement raised a contradiction alert quoting Adrian's and Sritharan's
   messages, with "3 tasks, about 15 hours" of impact. The server used about
   100 MB of memory.
-- Earlier browser testing with two users at once: all four areas, both themes,
-  and the 390 px mobile layout.
+- Earlier browser testing with two users at once, before the Sources section
+  was added: all four areas, both themes, and the 390 px mobile layout. The
+  Sources screens were checked on desktop only.
 
 **Not yet verified:**
 
@@ -677,12 +678,14 @@ directed the AI tools.
   authentication system, but the permission rules behind it are real and tested.
 - **Demo mode text is a fixed stand-in.** It is clearly labelled. The conflict
   *decisions* in demo mode come from transparent text rules.
-- **The TF-IDF fallback matches wording, not meaning**, so it is used only when
-  the embedding model can't load.
-- **Conflict review runs on new messages** after the brief is approved, and
-  skips questions. **Alerts → Check the chat again** re-scans everything.
-- **Images and audio are placeholders** without a media provider key, labelled
-  in the interface.
+- **The TF-IDF fallback matches wording, not meaning.** It is used when the
+  embedding model can't load, and on purpose on the free hosted demo (its memory
+  is too small for the model). Local runs use Sentence Transformers + FAISS.
+- **Chat conflict review runs on new messages** after the brief is approved, and
+  skips questions. **Alerts → Check the chat again** re-scans everything. Sources
+  (PRDs, bug tickets, meeting summaries) are checked as soon as they are added.
+- **Images and audio are labelled placeholders.** Real image and audio generation
+  will be added in future development (see Future scope).
 - **SQLite, single process.** Fine for a demo, not for many concurrent teams.
   In a Docker container the data resets when the container is recreated.
 - **After a provider error the app answers in demo mode for 30 seconds**, then
@@ -783,6 +786,10 @@ libraries are installed from `requirements.txt` and are not bundled in it.
 | README badges | [shields.io](https://shields.io) | Badge images generated by the shields.io service |
 | Hosting of the live demo | [Render](https://render.com) free plan | Render terms of service |
 | Keep-alive job | GitHub Actions | GitHub terms of service |
+| Code hosting, and the public API used to collect the benchmark issues | [GitHub](https://github.com) | GitHub terms of service |
+| Download of the embedding model | [Hugging Face Hub](https://huggingface.co) | Model licence above; Hugging Face terms |
+| Language runtime | [Python](https://www.python.org) 3.11+ | Python Software Foundation License |
+| Docker base image (`Dockerfile`) | [`python:3.11-slim`](https://hub.docker.com/_/python) | Docker Official Image; Python licence |
 
 **Data**
 
@@ -808,7 +815,7 @@ libraries are installed from `requirements.txt` and are not bundled in it.
 | **Sritharan N S** | AI workflow, evaluation and demo preparation |
 
 Thanks to the **OlympAI Hackathon** organisers and **MethodAI**, to our mentor
-for her guidance and support, and to the open-source projects listed under
-[Dependencies](#-dependencies).
+for her guidance and support, and to the open-source projects, models, fonts and services listed under
+[Credits and licences](#-credits-and-licences).
 
 <p align="center"><sub>Projecute — from team discussion to approved project work.</sub></p>
