@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" width="1200" height="440" role="img" aria-labelledby="t d">
+  <title id="t">Source review: PRDs, bug tickets and meeting summaries</title>
+  <desc id="d">A source document is split into statements, related claims are retrieved, the Architect agent checks for contradictions, assumptions and duplicates, the PM agent finds blockers and triages bugs into proposed fix tasks. Alerts quote the exact lines and list affected tasks and hours. The host resolves an alert, which records a decision and QA criteria, or dismisses it as a false alert.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10z" fill="#4FE0A8"/>
+    </marker>
+    <style>
+      .box   { fill: #141C36; stroke: #2A3560; stroke-width: 1.5 }
+      .agent { fill: #12261F; stroke: #4FE0A8; stroke-width: 1.5 }
+      .human { fill: #2A2140; stroke: #B79CFF; stroke-width: 1.5 }
+      .alert { fill: #2E1A24; stroke: #FF7A90; stroke-width: 1.5 }
+      .h     { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #E7ECF8 }
+      .p     { font: 400 13px 'Segoe UI', Arial, sans-serif; fill: #99A6C7 }
+      .lbl   { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #6C7A9C; letter-spacing: 1.5px }
+      .tag   { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #4FE0A8 }
+      .edge  { stroke: #4FE0A8; stroke-width: 2; fill: none; stroke-dasharray: 6 6; animation: dash 1.2s linear infinite; marker-end: url(#arrow) }
+      @keyframes dash { to { stroke-dashoffset: -24 } }
+    </style>
+  </defs>
+
+  <rect width="1200" height="440" rx="20" fill="#0B1020"/>
+  <text class="lbl" x="40" y="42">SOURCE REVIEW · LANGGRAPH: SPLIT → RETRIEVE → ARCHITECT → PM BLOCKERS → PM TRIAGE</text>
+
+  <!-- row 1: the graph -->
+  <rect class="box" x="40" y="66" width="190" height="104" rx="14"/>
+  <text class="h" x="58" y="98">Source document</text>
+  <text class="p" x="58" y="122">PRD · bug ticket ·</text>
+  <text class="p" x="58" y="142">meeting summary</text>
+
+  <rect class="box" x="270" y="66" width="190" height="104" rx="14"/>
+  <text class="h" x="288" y="98">1 · Split</text>
+  <text class="p" x="288" y="122">into one statement</text>
+  <text class="p" x="288" y="142">per line or sentence</text>
+
+  <rect class="box" x="500" y="66" width="190" height="104" rx="14"/>
+  <text class="h" x="518" y="98">2 · Retrieve</text>
+  <text class="p" x="518" y="122">related claims: chat,</text>
+  <text class="p" x="518" y="142">other sources, fix tasks</text>
+
+  <rect class="agent" x="730" y="66" width="200" height="104" rx="14"/>
+  <text class="h" x="748" y="98">3 · Architect agent</text>
+  <text class="p" x="748" y="122">contradiction · assumption</text>
+  <text class="p" x="748" y="142">· duplicate (batched)</text>
+
+  <rect class="agent" x="970" y="66" width="190" height="104" rx="14"/>
+  <text class="h" x="988" y="98">4 · PM agent</text>
+  <text class="p" x="988" y="122">finds blockers; triages</text>
+  <text class="p" x="988" y="142">bugs → proposed fix task</text>
+
+  <path class="edge" d="M232 118 H266"/>
+  <path class="edge" d="M462 118 H496"/>
+  <path class="edge" d="M692 118 H726"/>
+  <path class="edge" d="M932 118 H966"/>
+
+  <!-- row 2: alerts and the host -->
+  <rect class="alert" x="380" y="230" width="340" height="104" rx="14"/>
+  <text class="h" x="400" y="262">Alerts</text>
+  <text class="p" x="400" y="286">quote the exact lines and messages,</text>
+  <text class="p" x="400" y="306">list affected tasks and confirmed hours</text>
+
+  <path class="edge" d="M830 172 V200 H620 V226"/>
+  <path class="edge" d="M1065 172 V200 H640"/>
+
+  <rect class="human" x="790" y="230" width="150" height="104" rx="14"/>
+  <text class="h" x="810" y="262">Host</text>
+  <text class="p" x="810" y="286">decides on</text>
+  <text class="p" x="810" y="306">every alert</text>
+  <path class="edge" d="M722 282 H786"/>
+
+  <rect class="agent" x="990" y="214" width="170" height="64" rx="14"/>
+  <text class="tag" x="1006" y="236">RESOLVE</text>
+  <text class="p" x="1006" y="258">decision + QA criteria</text>
+  <rect class="box" x="990" y="290" width="170" height="64" rx="14"/>
+  <text class="tag" x="1006" y="312" style="fill:#B79CFF">DISMISS</text>
+  <text class="p" x="1006" y="334">closed, no decision</text>
+  <path class="edge" d="M942 270 H986"/>
+  <path class="edge" d="M942 300 H986"/>
+
+  <text class="p" x="40" y="400">Chat messages are also checked against these sources, and members' task submissions against existing tasks.</text>
+</svg>

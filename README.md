@@ -224,30 +224,6 @@ server enforces this, not just the interface, and tests cover it.
   <img src="assets/pipeline.svg" alt="Animated pipeline: team chat, PM agent, host approval, Architect agent, alert resolved by the host, QA agent, live dashboards" width="100%">
 </p>
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor M as Member
-    actor H as Host
-    participant PM as PM agent
-    participant R as Retrieval (Sentence Transformers + FAISS)
-    participant A as Architect agent
-    participant QA as QA agent
-    participant D as Dashboards (WebSocket)
-
-    M->>PM: Team discusses in the group chat
-    PM->>H: Draft brief (team can edit)
-    H->>PM: Approve brief
-    PM->>H: Proposed tickets (task, priority, hours, owner)
-    H->>D: Approve assignments
-    M->>R: New message: "checkout now requires an account"
-    R->>A: Most related earlier claims
-    A->>D: Alert with both source messages, affected tasks and confirmed hours
-    H->>A: Approve a resolution
-    A->>QA: Decision recorded
-    QA->>D: Acceptance criteria on every affected task
-```
-
 ### The logic, step by step
 
 1. **Brief.** The PM agent reads the busiest channel, so off-topic chatter in
@@ -291,18 +267,9 @@ sequenceDiagram
    open windows, and logged in **Activity** with a timestamp. **Download event
    log** saves the whole multi-agent event stream as JSON.
 
-```mermaid
-flowchart LR
-    S[PRD / bug ticket / meeting summary] --> SP[split into statements]
-    SP --> RT[retrieve related claims<br/>chat · other sources · fix tasks]
-    RT --> AR[Architect agent<br/>contradiction · assumption · duplicate]
-    AR --> BL[PM agent<br/>blockers]
-    BL --> TR[PM agent<br/>bug triage → proposed fix task]
-    AR & BL --> AL[Alerts with exact quotes,<br/>affected tasks and hours]
-    AL --> H{Host}
-    H -->|resolve| DE[Decision + QA criteria]
-    H -->|dismiss| X[Closed, no decision]
-```
+<p align="center">
+  <img src="assets/source-review.svg" alt="Source review: a PRD, bug ticket or meeting summary is split into statements, related claims are retrieved, the Architect agent checks for conflicts, the PM agent finds blockers and triages bugs; alerts go to the host, who resolves or dismisses them" width="100%">
+</p>
 
 ### Reliable AI output
 
@@ -320,30 +287,9 @@ flowchart LR
 
 ### Architecture
 
-```mermaid
-flowchart LR
-    subgraph Browser["Browser (HTML · CSS · JavaScript ES modules)"]
-        UI[Four areas + side panel]
-    end
-    subgraph Server["Python · FastAPI"]
-        API[HTTP API<br/>app/main.py]
-        WS[WebSocket hub<br/>app/ws.py]
-        P[Pipeline<br/>app/pipeline.py]
-        AG[LangGraph agents<br/>app/agents.py]
-        LLM[LLM adapter<br/>app/llm.py]
-        RET[Retrieval<br/>app/retrieval.py]
-        DB[(SQLite<br/>app/db.py)]
-    end
-    GROQ[[Groq free-tier LLM]]
-    UI -- REST + SSE --> API
-    UI <-- live events --> WS
-    API --> P --> AG
-    AG --> LLM --> GROQ
-    AG --> RET
-    P --> DB
-    API --> DB
-    P --> WS
-```
+<p align="center">
+  <img src="assets/architecture.svg" alt="Architecture: the browser talks to the FastAPI server (HTTP API, WebSocket hub, pipeline, LangGraph agents, LLM adapter, retrieval, SQLite), which calls the Groq free-tier LLM" width="100%">
+</p>
 
 ---
 
@@ -622,6 +568,7 @@ source** and paste any of these:
 | `data/github_issues_golang_results.json` | The latest benchmark results, as JSON |
 | **assets/** | |
 | `assets/banner.svg`, `assets/pipeline.svg` | Animated images used in this README (original) |
+| `assets/source-review.svg`, `assets/architecture.svg` | Source-review and architecture diagrams used in this README (original) |
 | **Project files** | |
 | `requirements.txt` | Python dependencies |
 | `.env.example` | Template for `.env` (no real keys) |

@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="1200" height="460" role="img" aria-labelledby="t d">
+  <title id="t">Projecute architecture</title>
+  <desc id="d">The browser (HTML, CSS and JavaScript modules) talks to the Python FastAPI server over HTTP, server-sent events and WebSockets. Inside the server: the HTTP API, SQLite storage, the WebSocket hub, the pipeline, the LangGraph agents, the LLM adapter, and retrieval with Sentence Transformers and FAISS. The LLM adapter calls the Groq free-tier model.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10z" fill="#4FE0A8"/>
+    </marker>
+    <marker id="back" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M10 0 0 5 10 10z" fill="#4FE0A8"/>
+    </marker>
+    <style>
+      .zone  { fill: #0F1630; stroke: #2A3560; stroke-width: 1.5; stroke-dasharray: 5 5 }
+      .box   { fill: #141C36; stroke: #2A3560; stroke-width: 1.5 }
+      .agent { fill: #12261F; stroke: #4FE0A8; stroke-width: 1.5 }
+      .ext   { fill: #2A2140; stroke: #B79CFF; stroke-width: 1.5 }
+      .h     { font: 700 15px 'Segoe UI', Arial, sans-serif; fill: #E7ECF8 }
+      .p     { font: 400 12.5px 'Segoe UI', Arial, sans-serif; fill: #99A6C7 }
+      .lbl   { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #6C7A9C; letter-spacing: 1.5px }
+      .note  { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #4FE0A8 }
+      .edge  { stroke: #4FE0A8; stroke-width: 2; fill: none; marker-end: url(#arrow) }
+      .both  { stroke: #4FE0A8; stroke-width: 2; fill: none; marker-end: url(#arrow); marker-start: url(#back) }
+    </style>
+  </defs>
+
+  <rect width="1200" height="460" rx="20" fill="#0B1020"/>
+
+  <!-- browser -->
+  <rect class="zone" x="30" y="60" width="230" height="340" rx="16"/>
+  <text class="lbl" x="48" y="86">BROWSER</text>
+  <rect class="box" x="50" y="104" width="190" height="120" rx="12"/>
+  <text class="h" x="66" y="134">Projecute UI</text>
+  <text class="p" x="66" y="158">HTML · CSS · JavaScript</text>
+  <text class="p" x="66" y="178">modules, no build step</text>
+  <text class="p" x="66" y="198">four areas + side panel</text>
+
+  <!-- server -->
+  <rect class="zone" x="330" y="30" width="650" height="390" rx="16"/>
+  <text class="lbl" x="350" y="56">SERVER · PYTHON · FASTAPI</text>
+
+  <!-- column A -->
+  <rect class="box" x="350" y="76" width="180" height="76" rx="12"/>
+  <text class="h" x="366" y="104">HTTP API</text>
+  <text class="p" x="366" y="128">app/main.py</text>
+
+  <rect class="box" x="350" y="188" width="180" height="76" rx="12"/>
+  <text class="h" x="366" y="216">SQLite</text>
+  <text class="p" x="366" y="240">app/db.py</text>
+
+  <rect class="box" x="350" y="300" width="180" height="76" rx="12"/>
+  <text class="h" x="366" y="328">WebSocket hub</text>
+  <text class="p" x="366" y="352">app/ws.py · live events</text>
+
+  <!-- column B -->
+  <rect class="box" x="590" y="76" width="180" height="76" rx="12"/>
+  <text class="h" x="606" y="104">Pipeline</text>
+  <text class="p" x="606" y="128">app/pipeline.py</text>
+
+  <rect class="agent" x="590" y="188" width="180" height="76" rx="12"/>
+  <text class="h" x="606" y="216">LangGraph agents</text>
+  <text class="p" x="606" y="240">PM · Architect · QA</text>
+
+  <!-- column C -->
+  <rect class="box" x="800" y="130" width="160" height="76" rx="12"/>
+  <text class="h" x="816" y="158">LLM adapter</text>
+  <text class="p" x="816" y="182">validate · cache · batch</text>
+
+  <rect class="box" x="800" y="236" width="160" height="90" rx="12"/>
+  <text class="h" x="816" y="264">Retrieval</text>
+  <text class="p" x="816" y="288">Sentence Transformers</text>
+  <text class="p" x="816" y="306">+ FAISS</text>
+
+  <!-- external -->
+  <rect class="ext" x="1010" y="130" width="160" height="76" rx="12"/>
+  <text class="h" x="1026" y="158">Groq</text>
+  <text class="p" x="1026" y="182">free-tier LLM</text>
+
+  <!-- browser ↔ server -->
+  <path class="edge" d="M242 140 H346"/>
+  <text class="note" x="262" y="132">REST + SSE</text>
+  <path class="both" d="M246 200 C300 200 300 338 346 338"/>
+  <text class="note" x="262" y="264">live updates</text>
+
+  <!-- inside the server -->
+  <path class="edge" d="M532 114 H586"/>
+  <path class="edge" d="M440 154 V184"/>
+  <path class="edge" d="M680 154 V184"/>
+  <path class="edge" d="M590 140 H560 V226 H534"/>
+  <path class="edge" d="M600 154 V170 H572 V338 H534"/>
+  <path class="edge" d="M772 214 C786 214 786 168 796 168"/>
+  <path class="edge" d="M772 238 C786 238 786 281 796 281"/>
+  <path class="edge" d="M962 168 H1006"/>
+
+  <text class="p" x="30" y="440">Without an AI key the LLM adapter answers in labelled demo mode; without the embedding model, retrieval falls back to TF-IDF.</text>
+</svg>
