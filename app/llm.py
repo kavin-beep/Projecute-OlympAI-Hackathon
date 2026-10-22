@@ -21,6 +21,7 @@ T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 MAX_RETRIES = 3
+RETRY_LIVE_AFTER = 30   # seconds of demo answers after a provider error before trying live AI again
 CACHE_MAX = 512
 
 
@@ -77,6 +78,7 @@ class LLM:
         self._key = os.environ.get("GROQ_API_KEY", "").strip()
         self._client = None
         self._degraded_reason: str | None = None
+        self._retry_at = 0.0          # after a provider error, live AI resumes at this time
         if self._key:
             try:
                 from groq import Groq
@@ -90,7 +92,7 @@ class LLM:
     @property
     def mode(self) -> str:
         """'live' when the Groq client is usable, otherwise 'mock' (demo mode)."""
-        return "live" if self._client else "mock"
+        return "live" if self._client is not None and time.time() >= self._retry_at else "mock"
 
     def status(self) -> dict:
         """What the header shows: live or demo mode, which model, and why it degraded."""
@@ -102,8 +104,8 @@ class LLM:
         }
 
     def _degrade(self, reason: str) -> None:
-        """Switch to demo mode for the rest of this process and remember why."""
-        self._client = None
+        """Use demo answers for a short cool-down after a provider error, then try live AI again."""
+        self._retry_at = time.time() + RETRY_LIVE_AFTER
         self._degraded_reason = reason
 
     # ---------------- free text ----------------
@@ -123,10 +125,11 @@ class LLM:
             if hit is not None:
                 return hit
         text: str | None = None
-        if self._client is not None:
+        if self.mode == "live":
             text = self._call_with_backoff(messages, temperature, max_tokens)
         if text is None:
-            text = (mock or (lambda: demo_answer(_last_question(messages))))()
+            # Not cached, so the same question gets a live answer once the AI is back.
+            return (mock or (lambda: demo_answer(_last_question(messages))))()
         if cache:
             _cache.put(key, text)
         return text
@@ -140,7 +143,7 @@ class LLM:
         mock: Callable[[], str] | None = None,
     ) -> Iterator[str]:
         """Yield text chunks. Falls back to chunking a mock answer."""
-        if self._client is not None:
+        if self.mode == "live":
             try:
                 stream = self._client.chat.completions.create(
                     model=self.model, messages=messages, temperature=temperature,
@@ -174,7 +177,7 @@ class LLM:
         Retries on invalid JSON, feeding the validation error back to the model.
         Falls back to the supplied mock when the provider is unavailable.
         """
-        if self._client is None:
+        if self.mode != "live":
             return schema.model_validate(mock()), "mock"
 
         shape = json.dumps(schema.model_json_schema(), separators=(",", ":"))
@@ -214,6 +217,7 @@ class LLM:
                 if json_mode:
                     kwargs["response_format"] = {"type": "json_object"}
                 resp = self._client.chat.completions.create(**kwargs)
+                self._degraded_reason = None          # the provider is healthy again
                 return resp.choices[0].message.content or ""
             except Exception as exc:
                 name = type(exc).__name__

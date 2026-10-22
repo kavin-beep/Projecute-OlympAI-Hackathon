@@ -1,0 +1,21 @@
+# Keeps the hosted demo awake. Render's free plan sleeps after 15 minutes without
+# visitors, and waking takes about a minute; pinging every 10 minutes means a
+# judge's click always lands on a running app.
+name: Keep the live demo awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the live demo
+        env:
+          LIVE_URL: ${{ vars.LIVE_URL || 'https://projecute.onrender.com' }}
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 20 --retry-all-errors \
+               --max-time 120 "$LIVE_URL/api/status"

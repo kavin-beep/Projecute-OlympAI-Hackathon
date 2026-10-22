@@ -13,7 +13,7 @@
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-agents-1C3C3C">
   <img alt="FAISS" src="https://img.shields.io/badge/Sentence%20Transformers-FAISS-4FE0A8">
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-storage-003B57?logo=sqlite&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-23%20passed-2EA44F">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-24%20passed-2EA44F">
   <img alt="Runs in GitHub Codespaces" src="https://img.shields.io/badge/runs%20in-GitHub%20Codespaces-24292F?logo=github&logoColor=white">
 </p>
 
@@ -21,8 +21,32 @@
 
 ## 🚀 Quick start for judges
 
-**No API key needed:** the full demo works out of the box in labelled demo mode.
-Pick whichever is easiest:
+### ▶ Try it live, with live AI: **<https://projecute.onrender.com>**
+
+Nothing to install and no key needed: the hosted prototype runs the PM,
+Architect and QA agents on a live language model for every visitor. Open the link
+in **two browser tabs**, sign in as **Kavin K** (the host) in one and
+**Sritharan N S** in the other, and follow the
+[two-minute demo](#-two-minute-demo-script).
+
+<details>
+<summary>About the hosted version</summary>
+
+- It runs on Render's free plan with the team's Groq key stored as a server
+  secret. Visitors use the AI through the server and never see the key.
+- A GitHub Action (`.github/workflows/keep-alive.yml`) pings it every 10 minutes,
+  so it is awake when you click.
+- To fit the free plan's memory, related-claim search uses the TF-IDF fallback.
+  The live Architect agent still makes every conflict decision. The local and
+  Codespaces versions below use the full Sentence Transformers + FAISS search.
+- The data resets to the staged demo when the server restarts.
+
+</details>
+
+### Or run it yourself
+
+Without a key these run in labelled demo mode; with a free Groq key they use
+live AI too. Pick whichever is easiest:
 
 | Option | Steps | Time |
 |---|---|---|
@@ -240,7 +264,7 @@ decisions came from the built-in rules (no AI key), and claim search used
 Sentence Transformers + FAISS:
 
 ```
-pytest                 23 passed
+pytest                 24 passed
 
 evaluate_conflicts     18 scenarios  ·  detection 18/18  ·  evidence 16/16
                        contradiction 7/7 · assumption 4/4 · duplicate 4/4 · none 2/2 · unclear 1/1
@@ -376,6 +400,9 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 | `run.bat` | One-command start for Windows: virtual environment, one-time install, `.env`, start, open browser |
 | `run.sh` | The same one-command start for macOS and Linux |
 | `.devcontainer/devcontainer.json` | GitHub Codespaces setup: installs dependencies, starts the app, opens it, and offers an optional `GROQ_API_KEY` secret |
+| `render.yaml` | Render Blueprint for the hosted live demo (free plan); the Groq key is entered in Render as a secret |
+| `requirements-render.txt` | Lighter dependency list for the hosted demo (no PyTorch, so it fits in 512 MB) |
+| `.github/workflows/keep-alive.yml` | Pings the hosted demo every 10 minutes so it never sleeps |
 | **app/** | **Backend (Python)** |
 | `app/__init__.py` | Marks `app` as a Python package |
 | `app/main.py` | FastAPI application: every HTTP endpoint for the four areas, sign-in, permission checks (member, host, same group), server-sent events for streamed chat, the WebSocket endpoint and the static frontend |
@@ -408,6 +435,7 @@ docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one pro
 | `tests/test_privacy.py` | Private chats, items, private AI help, group isolation, no cross-group access |
 | `tests/test_approvals.py` | Host-only approvals: brief, assignments, task edits, AI access, resolutions |
 | `tests/test_live_updates.py` | WebSocket updates reach the other member's window |
+| `tests/test_llm_recovery.py` | Live AI comes back by itself after a provider error |
 | `tests/__init__.py` | Marks `tests` as a package |
 | **data/** | |
 | `data/sample_duplicates_SYNTHETIC.csv` | 16 synthetic labelled pairs for the duplicate smoke test |
@@ -494,18 +522,22 @@ directed the AI tools.
 
 **Verified:**
 
-- 23 automated tests: privacy, host approvals, group isolation, the demo passcode and live updates.
+- 24 automated tests: privacy, host approvals, group isolation, the demo passcode, live-AI recovery and live updates.
 - The full demo flow: brief → host approval → tasks → new login requirement →
   alert with sources, affected tasks and hours → host resolution → QA criteria.
 - Sentence Transformers + FAISS retrieval and both evaluations (results above).
-- One live Groq call (`openai/gpt-oss-120b`) returned JSON that passed validation
-  and correctly flagged a contradiction.
+- The demo flow on live AI (`openai/gpt-oss-120b`) with the hosted build's
+  dependencies: the PM agent wrote the brief and 5 tasks, and the new login
+  requirement raised a contradiction alert quoting Adrian's and Sritharan's
+  messages, with "3 tasks, about 15 hours" of impact. The server used about
+  100 MB of memory.
 - Earlier browser testing with two users at once: all four areas, both themes,
   and the 390 px mobile layout.
 
 **Not yet verified:**
 
-- The whole demo running end to end on live AI.
+- Host resolution and QA criteria on live AI in the browser (covered in demo mode
+  and by the tests).
 - The Kaggle GitHub Issues benchmark.
 - More than three users, more than one group per person, and long sessions.
 
@@ -523,8 +555,10 @@ directed the AI tools.
   in the interface.
 - **SQLite, single process.** Fine for a demo, not for many concurrent teams.
   In a Docker container the data resets when the container is recreated.
-- **A provider error that can't be retried switches to demo mode** until
-  restart, and the header shows it.
+- **After a provider error the app answers in demo mode for 30 seconds**, then
+  returns to live AI by itself. The header shows which mode is active.
+- **The hosted demo shares one Groq free-tier key**, so many judges at the same
+  moment can hit its rate limit. Requests are retried with backoff first.
 
 ## 🔭 Future scope
 

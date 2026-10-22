@@ -1,0 +1,23 @@
+# Render Blueprint for the hosted Projecute demo (free plan).
+# In Render: New → Blueprint → pick this repository. Render asks for the two
+# secret values marked `sync: false`; they are stored in Render, never in git.
+services:
+  - type: web
+    name: projecute
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: python main.py
+    healthCheckPath: /api/status
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: HOST
+        value: 0.0.0.0
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_API_KEY        # your Groq key: turns on live AI for every visitor
+        sync: false
+      - key: DEMO_PASSCODE       # protects "Load demo" from visitors
+        sync: false
