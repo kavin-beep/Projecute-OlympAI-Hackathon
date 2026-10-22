@@ -218,7 +218,7 @@ server enforces this, not just the interface, and tests cover it.
 
 ---
 
-## ⚙️ How it works: the agent pipeline
+## ⚙ How it works: the agent pipeline
 
 <p align="center">
   <img src="assets/pipeline.svg" alt="Animated pipeline: team chat, PM agent, host approval, Architect agent, alert resolved by the host, QA agent, live dashboards" width="100%">
@@ -451,7 +451,7 @@ The CSV needs one labelled pair per row: `text_a,text_b,is_duplicate` (or
 
 ---
 
-## 🛠️ Setup and installation
+## 🛠 Setup and installation
 
 **Requirements:** Python 3.11 or newer, and about 2 GB of disk space for
 PyTorch and the embedding model.
@@ -475,7 +475,7 @@ runs in **labelled demo mode**, and the whole demo still works.
 The first run downloads the `all-MiniLM-L6-v2` embedding model (about 90 MB)
 from Hugging Face. Offline, the app uses the TF-IDF fallback instead.
 
-## ▶️ Running the main code
+## ▶ Running the main code
 
 ```bash
 python main.py
@@ -728,7 +728,7 @@ directed the AI tools.
 - Very large documents and many simultaneous judges on the shared free-tier key.
 - More than three users, more than one group per person, and long sessions.
 
-## ⚠️ Known limitations
+## ⚠ Known limitations
 
 - **No passwords.** Picking a name signs you in. This is a prototype, not an
   authentication system, but the permission rules behind it are real and tested.
