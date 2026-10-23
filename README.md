@@ -504,8 +504,10 @@ docker run -p 8000:8000 -e GROQ_API_KEY=your-key projecute
    > checkout now requires an account.
 4. **The alert (35s).** In Kavin's window, open **Alerts**. The card says the
    statements disagree about checkout and quotes **both source messages** with
-   their authors. It states the impact, for example *"Impact: 4 tasks, about 20
-   hours"* (the exact tasks depend on what the PM agent proposed).
+   their authors: the team's earlier "no login" agreement (Kavin's or Adrian's
+   message) and Sritharan's new requirement. It states the impact, for example
+   *"Impact: 4 tasks, about 20 hours"* (the exact tasks depend on what the PM
+   agent proposed).
 5. **The host decides (20s).** Pick a resolution and press **Approve this
    resolution**. Sritharan's window updates on its own: the alert is resolved, a
    decision is recorded, and the QA agent's acceptance criteria appear.
@@ -675,6 +677,9 @@ directed the AI tools.
   both chat messages; approving it recorded a decision listing T-1 to T-4; the
   event log downloaded as JSON; no console errors.
 - `ruff` lint passes with no findings.
+- The staged demo's conflict quotes two different teammates (Sritharan's new
+  requirement against Kavin's or Adrian's earlier "no login" message), checked in
+  demo mode, with live AI, and with live AI on the hosted build's search.
 - The code comments changed no code: every Python file parses to the same
   program as before, and every other change is a comment line only.
 - The full demo flow: brief → host approval → tasks → new login requirement →

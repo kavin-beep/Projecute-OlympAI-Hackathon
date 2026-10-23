@@ -29,11 +29,13 @@ MEMBERS = [
 ]
 
 # The chat the PM agent turns into the brief: (author, channel, message).
+# The "no account / no login" agreement comes from Adrian and Kavin, so the conflicting
+# update Sritharan posts in the demo is always quoted against a different person.
 CONVERSATION = [
     ("adrian", "checkout",
      "Starting on the checkout flow. Shoppers should be able to buy without creating an account — "
      "guest checkout keeps cart conversion high."),
-    ("sritharan", "checkout",
+    ("kavin", "checkout",
      "Agreed, no login for checkout. We just collect an email address at checkout so we can send the receipt."),
     ("adrian", "checkout",
      "So the checkout page needs an address form and a payment step, nothing else."),
