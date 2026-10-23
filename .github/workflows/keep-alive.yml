@@ -1,9 +1,10 @@
 # Keeps the hosted demo awake. Render's free plan sleeps after 15 minutes without
 # visitors, and waking takes about a minute; pinging every 10 minutes means a
-# judge's click always lands on a running app.
+# judge's click usually lands on a running app. GitHub runs scheduled jobs on a
+# best-effort basis, so runs can be late; the README tells judges about the wait.
 name: Keep the live demo awake
 
-# Runs every 10 minutes, and can also be started by hand from the Actions tab.
+# Scheduled every 10 minutes (best effort); can also be started by hand from the Actions tab.
 on:
   schedule:
     - cron: "*/10 * * * *"

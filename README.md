@@ -32,13 +32,18 @@ in **two browser tabs**, sign in as **Kavin K** (the host) in one and
 **Sritharan N S** in the other, and follow the
 [two-minute demo](#-two-minute-demo-script).
 
+> **If the first visit takes up to a minute,** the free server is waking up from
+> sleep. Wait for the page to open; after that everything is fast.
+
 <details>
 <summary>About the hosted version</summary>
 
 - It runs on Render's free plan with the team's Groq key stored as a server
   secret. Visitors use the AI through the server and never see the key.
-- A GitHub Action (`.github/workflows/keep-alive.yml`) pings it every 10 minutes,
-  so it is awake when you click.
+- Render's free plan puts the server to sleep after 15 minutes without visitors.
+  A GitHub Action (`.github/workflows/keep-alive.yml`) is scheduled to ping it
+  every 10 minutes, but GitHub runs scheduled jobs on a best-effort basis, so
+  there can be gaps. If it was asleep, the first visit wakes it in about a minute.
 - To fit the free plan's memory, related-claim search uses the TF-IDF fallback.
   The live Architect agent still makes every conflict decision. The local
   versions below use the full Sentence Transformers + FAISS search.
@@ -481,6 +486,7 @@ docker run -p 8000:8000 -e GROQ_API_KEY=your-key projecute
 | `Address already in use` / port 8000 busy | Start on another port: `PORT=8010 python main.py` (Windows: `set PORT=8010` then `python main.py`) |
 | Header says **Demo mode** | No Groq key is set. Add one to `.env` and restart; see Quick start |
 | No internet on first run | The app still starts and uses the TF-IDF search fallback; Settings → Advanced shows which search is active |
+| The live demo takes up to a minute to open | The free server sleeps when nobody uses it, and the first visit wakes it. Wait for the page, or refresh once |
 | Want a clean demo again | Press **Load demo** on the sign-in screen, or run `python -m scripts.seed_demo` |
 | Setup fails with `No such file or directory` during install (Windows) | The folder path is too long for Windows. Move the `projecute` folder somewhere short, such as `C:\projecute`, delete its `.venv` folder, and run `run.bat` again |
 
@@ -529,7 +535,7 @@ source** and paste any of these:
 | `run.sh` | The same one-command start for macOS and Linux |
 | `render.yaml` | Render Blueprint for the hosted live demo (free plan); the Groq key is entered in Render as a secret |
 | `requirements-render.txt` | Lighter dependency list for the hosted demo (no PyTorch, so it fits in 512 MB) |
-| `.github/workflows/keep-alive.yml` | Pings the hosted demo every 10 minutes so it never sleeps |
+| `.github/workflows/keep-alive.yml` | Scheduled to ping the hosted demo every 10 minutes (GitHub runs it on a best-effort basis) so it is usually awake |
 | **app/** | **Backend (Python)** |
 | `app/__init__.py` | Marks `app` as a Python package |
 | `app/main.py` | FastAPI application: every HTTP endpoint for the four areas, sign-in, permission checks (member, host, same group), server-sent events for streamed chat, the WebSocket endpoint and the static frontend |
