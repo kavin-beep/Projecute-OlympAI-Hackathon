@@ -24,6 +24,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import agents, retrieval  # noqa: E402
 from app.llm import llm  # noqa: E402
 
+# Unrelated statements placed around every planted claim, so the search has to pick
+# the right one.
 DISTRACTORS = [
     "The marketing site needs new screenshots before launch.",
     "We should translate the help centre into Spanish next quarter.",
@@ -120,6 +122,7 @@ def run(verbose: bool) -> int:
     rows: list[tuple[str, str, str, bool, str]] = []
 
     for sid, planted, new_claim, expected in SCENARIOS:
+        # Run the same review pipeline the app uses, then score kind and evidence.
         corpus = [("planted", planted)] + [(f"d{i}", d) for i, d in enumerate(DISTRACTORS)]
         state = agents.run_review_pipeline(new_claim, corpus)
         verdict = state.get("verdict") or {}
@@ -139,6 +142,7 @@ def run(verbose: bool) -> int:
         rows.append((sid, expected, got, hit, ev_note))
 
     total = len(SCENARIOS)
+    # ---------------------------------------------------------------- report
     print("Planted conflict scenarios")
     print(f"  Scenarios:      {total}  (each with {len(DISTRACTORS)} distractor claims)")
     print(f"  Judged by:      {'Groq (' + llm.model + ')' if llm.mode == 'live' else 'built-in rules (no AI provider key)'}")

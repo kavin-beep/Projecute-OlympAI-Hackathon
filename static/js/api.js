@@ -1,5 +1,10 @@
 // API client, session state and the WebSocket connection.
 
+// How the frontend fits together: app.js (shell) loads one module per area - chat.js,
+// group.js, workspace.js, board.js - and they all share this file (server calls,
+// shared state, live events) and ui.js (building blocks such as el(), modal(), toast()).
+
+// Shared app state: who is signed in, and what is open in each area.
 export const state = {
   token: sessionStorage.getItem('projecute_token') || '',
   me: null,
@@ -16,6 +21,7 @@ export const state = {
   status: null,
 };
 
+// A tiny event bus: WebSocket events arrive as 'ws:<name>' and any module can listen.
 const listeners = new Map();
 // Subscribe to a live event (from the WebSocket or the app itself).
 export function on(event, fn) {
@@ -27,6 +33,7 @@ export function emit(event, payload) {
   (listeners.get(event) || []).forEach((fn) => fn(payload));
 }
 
+// An error carrying the server's message and HTTP status, shown to the user in a toast.
 export class ApiError extends Error {
   constructor(message, status = 0) { super(message); this.status = status; }
 }
@@ -41,6 +48,7 @@ export async function api(path, { method = 'GET', body } = {}) {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  // The session ended (e.g. the demo was reset): sign out and show the sign-in screen.
   if (res.status === 401) {
     setToken('');
     emit('signed-out');
@@ -72,6 +80,7 @@ export async function stream(path, body, onEvent) {
     try { detail = JSON.parse(text).detail || detail; } catch { /* keep default */ }
     throw new ApiError(detail);
   }
+  // Read the answer as it arrives; each 'data: {...}' block is one event (delta or done).
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -104,6 +113,7 @@ export function connectSocket() {
     const { event, payload } = JSON.parse(ev.data);
     emit(`ws:${event}`, payload);
   });
+  // Reconnect after a drop, waiting a little longer each time (up to 2.4 s).
   socket.addEventListener('close', () => {
     socket = null;
     if (!state.token) return;

@@ -1,12 +1,17 @@
+# Full dependencies, for local runs and Docker:  pip install -r requirements.txt
+# Web server: FastAPI app, Uvicorn server, WebSockets, data validation, form parsing.
 fastapi>=0.115
 uvicorn[standard]>=0.30
 websockets>=12
 pydantic>=2.7
 python-multipart>=0.0.9
+# AI: the Groq SDK (OpenAI gpt-oss models) and LangGraph (the agent graphs).
 groq>=0.11
 langgraph>=0.2
+# Related-claim search: embeddings + FAISS (numpy also runs the TF-IDF fallback).
 sentence-transformers>=3.0
 faiss-cpu>=1.8
 numpy>=1.26
+# Tests (python -m pytest -q): pytest, and httpx for FastAPI's test client.
 pytest>=8.0
 httpx>=0.27

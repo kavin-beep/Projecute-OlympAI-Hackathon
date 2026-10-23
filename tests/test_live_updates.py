@@ -1,4 +1,7 @@
 """Live updates: both members' dashboards change over WebSockets."""
+# Each test's name states the rule it checks. Run this file alone with:
+#   python -m pytest -q tests/test_live_updates.py
+
 from __future__ import annotations
 
 import json

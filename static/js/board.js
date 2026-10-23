@@ -1,8 +1,14 @@
 // Group workspace: Brief, Sources, Tasks, Decisions, Alerts, Activity, Team outputs.
 
+// Every section reads state.workspace (one request returns the whole workspace) and
+// redraws from it. The buttons call the server, which pushes a live event to every
+// member; initBoardLive (bottom) then re-fetches, so all dashboards stay the same.
+// Role rules are checked on the server; the host-only buttons here are just a convenience.
+
 import { api, on, state } from './api.js';
 import { $, clear, codeBlock, el, emptyState, icon, markdown, modal, relative, skeleton, timeOf, toast } from './ui.js';
 
+// The seven sections in the workspace sidebar: [key, label, icon].
 const SECTIONS = [
   ['brief', 'Brief', 'doc'],
   ['sources', 'Sources', 'work'],
@@ -13,6 +19,7 @@ const SECTIONS = [
   ['outputs', 'Team outputs', 'share'],
 ];
 
+// Which section is showing.
 let section = 'brief';
 let gotoChannelMessage = null;   // set by app.js
 
@@ -59,6 +66,7 @@ function renderSection() {
 }
 
 // ---------------------------------------------------------------- sources
+// The three kinds of source document the agents cross-check.
 const SOURCE_KINDS = [
   ['prd', 'PRD', 'Product requirements: what to build and the rules it must follow.'],
   ['bug', 'Bug ticket', 'A problem someone found. The PM agent triages it into a task.'],
@@ -150,6 +158,7 @@ function renderBrief(body) {
   const approved = w.brief?.status === 'approved';
 
   const action = el('div', { class: 'row-between' });
+  // Only the host gets 'Approve brief'.
   if (w.brief && !approved && isHost) {
     const approve = el('button', { class: 'btn primary' }, icon('check', 15), 'Approve brief');
     approve.addEventListener('click', async () => {
@@ -193,6 +202,7 @@ function renderBrief(body) {
   body.append(card);
 
   if (approved) {
+    // Once approved: ask the PM agent to turn the brief into tasks.
     const next = el('div', { class: 'card' });
     next.append(el('h4', {}, 'Next step'),
       el('p', { class: 'meta' }, 'Turn the approved brief into tasks with owners, priorities and estimates.'));
@@ -209,6 +219,7 @@ function renderBrief(body) {
     body.append(next);
   }
 
+  // Parallel Futures sits under the brief.
   body.append(futuresBlock());
 }
 
@@ -561,6 +572,7 @@ function renderAlerts(body) {
   for (const a of w.alerts) body.append(alertCard(a));
 }
 
+// Plain-language label for each kind of alert.
 const KIND_TEXT = {
   duplicate: 'Looks like the same task',
   contradiction: 'These statements disagree',
@@ -587,6 +599,7 @@ export function alertCard(a, compact = false) {
   body.append(el('h3', {}, a.headline));
   if (a.explanation) body.append(el('div', { class: 'explain' }, a.explanation));
 
+  // Evidence: each quoted message, document line or task; clicking one opens it.
   if (a.sources.length) {
     const ev = el('div', { class: 'evidence' });
     for (const s of a.sources) {
@@ -609,6 +622,7 @@ export function alertCard(a, compact = false) {
     body.append(ev);
   }
 
+  // Impact: confirmed hours at risk, and chips for the affected tasks.
   const impact = el('div', { class: 'impact' }, el('span', { class: 'big' }, a.impact_label));
   if (a.tickets.length) {
     const chips = el('span', { class: 'chips' });
@@ -627,6 +641,7 @@ export function alertCard(a, compact = false) {
       el('div', { class: 'meta' }, `${a.status === 'dismissed' ? 'Dismissed' : 'Decided'} by ${a.resolved_by_name || 'the host'}`),
       el('p', { style: 'margin:4px 0 0' }, a.resolution)));
   } else if (state.group.is_host) {
+    // Host: pick one of the Architect's options (or write one), then approve it.
     let picked = null;
     const opts = el('div', { class: 'options' });
     const custom = el('textarea', { class: 'field hidden', style: 'min-height:80px', placeholder: 'Write what the team decided.' });
@@ -810,6 +825,7 @@ function openSide(title, node) {
 
 // Apply live workspace updates pushed over the WebSocket.
 export function initBoardLive() {
+  // Any workspace event for the open group re-fetches the workspace and redraws it.
   const refresh = async () => {
     if (!state.group) return;
     state.workspace = await api(`/groups/${state.group.group.id}/workspace`);
@@ -823,6 +839,7 @@ export function initBoardLive() {
       if ($('#sidePanel').classList.contains('open')) { /* keep panel content as is */ }
     });
   }
+  // A new open alert also shows a toast, wherever the user is in the app.
   on('ws:alert', ({ group_id, data }) => {
     if (!state.group || group_id !== state.group.group.id) return;
     if (data.status === 'open') toast(`Alert: ${data.headline}`, 'err');

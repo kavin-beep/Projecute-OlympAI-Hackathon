@@ -33,12 +33,14 @@ def open_when_ready(url: str) -> None:
 
 def main() -> None:
     """Start the Projecute web server."""
+    # Read where to listen from the environment (see the list at the top of this file).
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{port}"
     print(f"Projecute is starting on {url}  (the first start takes about a minute)")
     if os.environ.get("OPEN_BROWSER") == "1":
         threading.Thread(target=open_when_ready, args=(url,), daemon=True).start()
+    # Start the web server with the FastAPI app defined in app/main.py.
     uvicorn.run("app.main:app", host=host, port=port)
 
 

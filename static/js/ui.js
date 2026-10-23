@@ -1,5 +1,6 @@
 // Shared UI helpers: icons, toasts, modals, markdown, formatting.
 
+// Short names for finding elements: $('#id') for one, $$('.class') for all.
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -24,6 +25,7 @@ export function el(tag, attrs = {}, ...kids) {
 export function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); return node; }
 
 // ------------------------------------------------------------------ icons
+// Hand-drawn line icons (SVG paths on a 20x20 grid), so no icon library is needed.
 const P = (d, extra = '') => `<path d="${d}" ${extra}/>`;
 const ICONS = {
   chat: P('M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H8l-4 3v-3H5.5A2.5 2.5 0 0 1 3 11.5z'),
@@ -65,6 +67,7 @@ export function icon(name, size = 16, stroke = 1.6) {
 }
 
 // ------------------------------------------------------------------ toasts
+// A short message in the corner that fades away (errors stay a little longer).
 export function toast(message, kind = 'ok') {
   const node = el('div', { class: `toast ${kind}` }, el('span', { class: 'ic' }, icon(kind === 'err' ? 'alert' : 'check', 15)), message);
   $('#toasts').append(node);
@@ -73,6 +76,7 @@ export function toast(message, kind = 'ok') {
 }
 
 // ------------------------------------------------------------------ modal
+// A dialog. onConfirm may be async; returning false keeps the dialog open.
 export function modal({ title, body, confirmLabel = 'Save', onConfirm, cancelLabel = 'Cancel', danger = false }) {
   const scrim = $('#scrim'), box = $('#modal');
   clear(box);
@@ -94,12 +98,14 @@ export function modal({ title, body, confirmLabel = 'Save', onConfirm, cancelLab
   return close;
 }
 
+// Clicking outside a dialog or pressing Escape closes it.
 $('#scrim')?.addEventListener('click', (e) => { if (e.target.id === 'scrim') $('#scrim').classList.remove('open'); });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { $('#scrim')?.classList.remove('open'); $('#sidePanel')?.classList.remove('open'); }
 });
 
 // ------------------------------------------------------------------ side panel
+// Show content in the side panel on the right.
 export function sidePanel(title, body) {
   $('#spTitle').textContent = title;
   clear($('#spBody')).append(body);
@@ -109,6 +115,7 @@ export function sidePanel(title, body) {
 export function closePanel() { $('#sidePanel').classList.remove('open'); }
 
 // ------------------------------------------------------------------ text
+// Make text safe to put into HTML (stops injected markup or scripts).
 export function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -130,6 +137,7 @@ export function markdown(src) {
   let i = 0, html = '';
   const flushTo = () => { if (html) { wrap.insertAdjacentHTML('beforeend', html); html = ''; } };
 
+  // Read line by line: code fences, headings, lists, quotes, tables, then paragraphs.
   while (i < lines.length) {
     const line = lines[i];
     const fence = line.match(/^```(\w*)/);
@@ -198,6 +206,7 @@ export function codeBlock(code, lang = '') {
 }
 
 // ------------------------------------------------------------------ format
+// Up to two initials from a name, e.g. 'Kavin K' -> 'KK'.
 export function initials(name) {
   return String(name || '?').split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 }

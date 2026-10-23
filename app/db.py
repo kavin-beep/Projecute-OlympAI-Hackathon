@@ -3,6 +3,15 @@
 All reads go through helpers that take the *requesting* user id so privacy is
 enforced in the backend, not in the UI (deck slide 12).
 """
+# How to read this file
+# ---------------------
+#   SCHEMA            - every table, created on first start (one SQLite file in data/).
+#   connect / reset   - one shared connection, guarded by a lock so requests in
+#                       different threads never write at the same time.
+#   q / q1 / ex       - run SQL with ? placeholders (values are never pasted into SQL).
+#   is_member/is_host - the permission checks every group endpoint relies on.
+#   log_activity      - the Activity stream each workspace shows.
+
 from __future__ import annotations
 
 import os
@@ -13,14 +22,22 @@ import uuid
 from collections.abc import Iterable
 from typing import Any
 
+# Where the database file lives: PROJECUTE_DB if set (tests use a temporary file),
+# otherwise data/projecute.db.
 DB_PATH = os.environ.get(
     "PROJECUTE_DB",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "projecute.db"),
 )
 
+# One connection for the whole process, protected by a re-entrant lock.
 _lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
 
+# ---------------------------------------------------------------- tables
+# Groups of tables, in order: users and sessions; individual chat (private);
+# groups, channels, messages, reactions and private AI help; personal workspaces
+# and items; the group workspace (brief, tickets, decisions, sources, alerts and
+# their evidence, activity); and the two innovations (Parallel Futures, Human Unit Test).
 SCHEMA = """
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
@@ -277,6 +294,7 @@ CREATE INDEX IF NOT EXISTS idx_activity_group ON activity(group_id, created_at);
 """
 
 
+# ---------------------------------------------------------------- helpers
 def now() -> float:
     """Current time as a Unix timestamp (seconds)."""
     return time.time()

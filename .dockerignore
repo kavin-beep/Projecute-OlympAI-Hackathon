@@ -3,6 +3,7 @@
 data/*.db
 data/*.db-wal
 data/*.db-shm
+# Caches, the virtual environment and tool folders are not needed in the image.
 __pycache__/
 *.pyc
 .pytest_cache/

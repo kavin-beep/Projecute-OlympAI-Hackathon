@@ -4,6 +4,8 @@ import { api, on, state } from './api.js';
 import { $, autoGrow, avatar, clear, el, emptyState, icon, markdown, relative, skeleton, timeOf, toast } from './ui.js';
 
 const EMOJI = ['👍', '🎯', '🔥', '🙌', '👀'];
+// This module's state: the composer's AI mode ('none', 'public' or 'private'),
+// the message being replied to, and the typing-indicator timers.
 let aiMode = 'none';
 let replyTo = null;
 let typingTimer = null;
@@ -166,6 +168,7 @@ function messageNode(m, prev) {
       el('span', { class: 'meta', style: 'margin-left:auto' }, timeOf(m.created_at)));
   }
   const isAi = m.kind === 'ai_public';
+  // Messages from the same person within 5 minutes are grouped under one name.
   const cont = prev && prev.kind === m.kind && prev.user_id === m.user_id && !m.reply_to_id &&
     (m.created_at - prev.created_at) < 300 && prev.kind !== 'notice';
   const node = el('div', { class: `msg${cont ? ' cont' : ''}${isAi ? ' ai' : ''}`, 'data-id': m.id });
@@ -201,6 +204,7 @@ function messageNode(m, prev) {
   }
   node.append(col);
 
+  // Hover tools: quick reactions and reply.
   const tools = el('div', { class: 'tools' });
   for (const e of EMOJI) {
     const b = el('button', { class: 'iconbtn', title: `React ${e}`, style: 'font-size:14px' }, e);
@@ -285,6 +289,7 @@ export function initGroupComposer() {
   }
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
+    // Tell the others 'X is typing' at most every 2.5 seconds.
     else if (Date.now() - lastTypedAt > 2500) {
       lastTypedAt = Date.now();
       api(`/groups/${state.group.group.id}/typing`, { method: 'POST' }).catch(() => {});
@@ -307,6 +312,7 @@ async function sendGroupMessage() {
   clear($('#replyBar'));
   try {
     const res = await api(`/groups/${state.group.group.id}/channels/${state.channelId}/messages`, { method: 'POST', body });
+    // Private help comes back only in this response, never over the group's live feed.
     if (res.private_help) renderPrivate(res.private_help);
     if (res.alert && openAlert) {
       toast('The Architect agent flagged something in the shared workspace', 'err');
@@ -322,6 +328,7 @@ async function sendGroupMessage() {
 
 // ---------------------------------------------------------------- live
 export function initGroupLive() {
+  // A new or updated message (e.g. a reaction) in the open channel: redraw the list.
   on('ws:group_message', ({ group_id, data }) => {
     if (!state.group || group_id !== state.group.group.id) return;
     if (data.channel_id !== state.channelId) return;
@@ -331,6 +338,7 @@ export function initGroupLive() {
     else state.messages.push(data);
     renderMessages();
   });
+  // Someone is typing: show it for 2.6 seconds.
   on('ws:typing', ({ group_id, data }) => {
     if (!state.group || group_id !== state.group.group.id) return;
     const bar = $('#typing');
@@ -338,6 +346,7 @@ export function initGroupLive() {
     clearTimeout(typingTimer);
     typingTimer = setTimeout(() => clear(bar), 2600);
   });
+  // The host changed the AI settings: update the switches and the composer.
   on('ws:group', ({ group_id, data }) => {
     if (state.group && group_id === state.group.group.id) {
       state.group.group = data;

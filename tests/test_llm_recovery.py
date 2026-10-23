@@ -1,4 +1,7 @@
 """With a key configured, the app stays in live mode: no demo answers after a provider error."""
+# Each test's name states the rule it checks. Run this file alone with:
+#   python -m pytest -q tests/test_llm_recovery.py
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -9,6 +12,9 @@ from app import llm as llm_module
 from app.llm import BUSY_MESSAGE, LLM, AIUnavailable
 
 
+# ---------------------------------------------------------------- fake providers
+# Stand-ins for the Groq client, so these tests need no key and no network.
+# Exceptions are matched by class name in app/llm.py, as with the real SDK.
 class BadRequestError(Exception):
     """Stands in for a non-retryable error from the provider."""
 

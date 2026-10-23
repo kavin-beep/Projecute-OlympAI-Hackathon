@@ -4,6 +4,10 @@ No provider key is configured in this prototype, so both fall back to the mock
 path: a generated placeholder image (SVG drawn here, deterministic from the
 prompt) and browser text-to-speech (the frontend speaks the script).
 """
+# Image and audio generation are future development (see README): today an image
+# item is a placeholder drawn here, and an audio item is a script read aloud by the
+# browser. Both are clearly labelled in the app as placeholders.
+
 from __future__ import annotations
 
 import base64
@@ -38,6 +42,8 @@ def generate_image(prompt: str, name: str) -> tuple[str, str]:
     if image_provider():
         # A real provider would be called here; none is configured in this build.
         pass
+    # Draw seven soft circles on a gradient; positions and sizes come from a hash of the
+    # prompt, so the same prompt always gives the same picture.
     colors = _palette(prompt or name)
     h = hashlib.sha256((prompt + name).encode()).digest()
     shapes = []
@@ -59,6 +65,7 @@ def generate_image(prompt: str, name: str) -> tuple[str, str]:
 <text x="24" y="360" fill="#e8ecf6" font-family="system-ui,sans-serif" font-size="19">{_esc(label)}</text>
 <text x="24" y="383" fill="#9aa4bd" font-family="system-ui,sans-serif" font-size="13">Placeholder image — no image provider configured</text>
 </svg>"""
+    # Return the SVG as a data URL the browser can show directly in an <img>.
     data = base64.b64encode(svg.encode()).decode()
     return f"data:image/svg+xml;base64,{data}", "mock"
 

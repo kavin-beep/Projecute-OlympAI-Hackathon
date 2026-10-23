@@ -1,4 +1,7 @@
 """Host approvals: brief, task assignments, AI accessibility and resolutions."""
+# Each test's name states the rule it checks. Run this file alone with:
+#   python -m pytest -q tests/test_approvals.py
+
 from __future__ import annotations
 
 from app import db

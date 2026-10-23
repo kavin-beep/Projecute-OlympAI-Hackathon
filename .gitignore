@@ -1,11 +1,14 @@
+# Kept out of git: the secret .env file and the local database files.
 .env
 data/*.db
 data/*.db-wal
 data/*.db-shm
+# Python caches and the local virtual environment.
 __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+# Tool folders, and README.txt (the plain-text copy built only for the submission zip).
 .claude/
 .ruff_cache/
 README.txt

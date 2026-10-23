@@ -3,6 +3,9 @@
 User A can never read B's individual chats, workspace items or private AI help,
 and individual content only enters a group through explicit sharing.
 """
+# Each test's name states the rule it checks. Run this file alone with:
+#   python -m pytest -q tests/test_privacy.py
+
 from __future__ import annotations
 
 from tests.conftest import auth, login

@@ -9,6 +9,9 @@
 </head>
 <body>
 
+<!-- A one-page app: the sign-in screen, then the app itself (top bar, left rail, four areas). -->
+<!-- The elements with ids are empty containers; the JavaScript in /static/js fills them. -->
+
 <!-- sign in -->
 <div class="gate" id="gate">
   <div class="box">
@@ -25,6 +28,7 @@
 </div>
 
 <div class="app hidden" id="app">
+  <!-- Top bar: AI status pill, Load demo, theme, settings, signed-in user -->
   <header class="topbar">
     <button class="iconbtn" id="btnMenu" title="Show the list" aria-label="Show the list"></button>
     <div class="brand"><img src="/static/logo.svg" width="24" height="24" alt=""> <span class="brandname">Projecute</span></div>
@@ -37,9 +41,11 @@
   </header>
 
   <div class="body">
+    <!-- Left rail: one button per area (drawn by app.js) -->
     <nav class="rail" id="rail"></nav>
 
     <!-- 1. Individual chat -->
+    <!-- Columns: chat history with search | the open chat -->
     <section class="view chat" id="view-chat">
       <aside class="pane-list">
         <div class="pane-head">
@@ -72,6 +78,7 @@
     </section>
 
     <!-- 2. Group chat -->
+    <!-- Columns: groups | channels and host controls | messages and composer | members -->
     <section class="view group" id="view-group">
       <div class="serverrail" id="serverRail"></div>
       <aside class="pane-list">
@@ -90,6 +97,7 @@
         <div class="composer" style="padding-top:0">
           <div class="composer-inner">
             <div id="privateArea"></div>
+            <!-- Three ways to send: a plain message, a public AI answer, or private AI help -->
             <div class="aibar">
               <div class="seg" id="aiSeg">
                 <button data-mode="none" class="on">Message</button>
@@ -113,6 +121,7 @@
     </section>
 
     <!-- 3. Individual workspace -->
+    <!-- Columns: projects and item search | workspace chat | work panel with named items -->
     <section class="view work" id="view-work">
       <aside class="pane-list">
         <div class="pane-head"><h3>Projects</h3><div style="flex:1"></div>
@@ -155,6 +164,7 @@
     </section>
 
     <!-- 4. Group workspace -->
+    <!-- Columns: section list (Brief, Sources, Tasks, ...) | the selected section (board.js) -->
     <section class="view board" id="view-board">
       <aside class="pane-list">
         <div class="pane-head"><h3 id="boardGroupName" class="truncate">Shared workspace</h3></div>
@@ -165,6 +175,7 @@
   </div>
 </div>
 
+<!-- Shared overlays: the details side panel, dialogs and toast messages -->
 <div class="sidepanel" id="sidePanel">
   <div class="ph">
     <h3 id="spTitle">Details</h3>
@@ -176,6 +187,7 @@
 <div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
 <div class="toasts" id="toasts"></div>
 
+<!-- app.js starts everything and imports the other modules -->
 <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>

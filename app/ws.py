@@ -1,4 +1,9 @@
 """WebSocket hub: live updates for group dashboards and private panels."""
+# How it works: each open browser window keeps one WebSocket. The hub remembers the
+# sockets per user, so the server can push an event (new message, new alert, updated
+# tasks) to exactly the people who should see it, e.g. only the members of one group,
+# or only the asker for private AI help.
+
 from __future__ import annotations
 
 import asyncio
@@ -45,6 +50,7 @@ class Hub:
 
     async def _send(self, targets: list[WebSocket], event: str, payload: Any) -> None:
         """Send to each socket and drop the ones that have closed."""
+        # The browser receives {event, payload} and api.js re-emits it as 'ws:<event>'.
         message = {"event": event, "payload": payload}
         dead: list[WebSocket] = []
         for ws in targets:
@@ -65,4 +71,5 @@ class Hub:
         return set(self._by_user.keys())
 
 
+# The single shared hub imported by app/main.py.
 hub = Hub()

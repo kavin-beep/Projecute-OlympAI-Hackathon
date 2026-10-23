@@ -3,6 +3,17 @@
 Pure(ish) functions over the database. They return the events the caller should
 broadcast over WebSockets, so the HTTP layer stays thin.
 """
+# How to read this file
+# ---------------------
+# This is the team workflow from the deck (slides 7 and 10), as plain functions:
+#   team chat -> PM agent drafts the brief -> host approves -> PM proposes tasks ->
+#   host approves assignments -> every new message / source / task is checked by the
+#   Architect agent -> alerts with evidence -> host resolves or dismisses -> decision
+#   recorded -> QA agent writes acceptance criteria.
+# Each function changes the database and returns a list of (event, data) pairs;
+# app/main.py sends those to every member's browser so dashboards update live.
+# The agents themselves (prompts, rules, LangGraph graphs) live in app/agents.py.
+
 from __future__ import annotations
 
 import json
@@ -11,7 +22,9 @@ from typing import Any
 from . import agents, db
 from .schemas import BriefDraft
 
+# A live update for the browsers: (event name, data), e.g. ('tickets', [...]).
 Event = tuple[str, Any]
+
 
 
 # ---------------------------------------------------------------- lookups
@@ -28,6 +41,8 @@ def user_name(user_id: str | None) -> str:
     return row["display_name"] if row else ""
 
 
+# The three 'corpora' below are what the Architect searches when it looks for
+# statements related to a new one: chat messages, source-document statements, tasks.
 def chat_corpus(group_id: str, exclude_id: str | None = None) -> list[tuple[str, str]]:
     """(id, text) of every user message in the group, for related-claim search."""
     rows = db.q(
@@ -56,6 +71,8 @@ def ticket_corpus(group_id: str, exclude_id: str | None = None) -> list[tuple[st
             for r in rows if r["id"] != exclude_id]
 
 
+# Words that start a question. Questions don't claim anything about the plan,
+# so they are never flagged as conflicts.
 _QUESTION_START = ("what", "why", "how", "who", "when", "where", "which", "do we", "should we",
                    "can we", "is it", "are we", "did we", "does it", "any chance", "anyone")
 
@@ -90,7 +107,10 @@ def group_messages(group_id: str, channel_id: str | None = None) -> list[dict]:
              "created_at": r["created_at"], "kind": "user"} for r in rows]
 
 
+
 # ---------------------------------------------------------------- serialise
+# The serialise functions turn database rows into the JSON the browser shows,
+# adding names, parsed lists and the plain-language impact line.
 def serialize_ticket(row) -> dict:
     """A ticket row plus owner name and parsed acceptance criteria."""
     t = dict(row)
@@ -102,6 +122,7 @@ def serialize_ticket(row) -> dict:
 def serialize_alert(alert_row, *, full: bool = False) -> dict:
     """An alert with its source messages, each affected task once, and the hours impact."""
     a = dict(alert_row)
+    # Evidence: the chat messages behind the alert, plus document lines and tasks (_evidence).
     a["options"] = json.loads(a["options"]) if a.get("options") else []
     a["resolved_by_name"] = user_name(a.get("resolved_by"))
     sources = db.q(
@@ -124,6 +145,8 @@ def serialize_alert(alert_row, *, full: bool = False) -> dict:
         seen.add(row["id"])
         unique.append(serialize_ticket(row))
     a["tickets"] = unique
+    # Impact (deck slide 10): sum only the hours the team has confirmed, and say how
+    # many estimates are still unconfirmed.
     a["confirmed_hours"] = round(sum(t["estimated_hours"] for t in unique if t["hours_confirmed"]), 1)
     a["unconfirmed_count"] = sum(1 for t in unique if not t["hours_confirmed"])
     a["impact_label"] = _impact_label(unique, a["confirmed_hours"], a["unconfirmed_count"])
@@ -133,6 +156,7 @@ def serialize_alert(alert_row, *, full: bool = False) -> dict:
 def _evidence(alert_id: str) -> list[dict]:
     """Evidence that is not a chat message: document statements and existing tasks, quoted exactly."""
     out: list[dict] = []
+    # Each evidence row points at a document statement ('claim') or a task ('ticket').
     for e in db.q("SELECT ref_kind, ref_id FROM alert_evidence WHERE alert_id=?", (alert_id,)):
         if e["ref_kind"] == "claim":
             row = db.q1("SELECT c.text, d.id AS document_id, d.kind, d.title, d.created_at, u.display_name AS who"
@@ -166,6 +190,7 @@ def _impact_label(tickets: list[dict], hours: float, unconfirmed: int) -> str:
 
 def workspace_state(group_id: str) -> dict:
     """Everything the group workspace shows, in one dict."""
+    # One query per workspace section; the browser re-renders from this single dict.
     brief = db.q1("SELECT * FROM briefs WHERE group_id=? ORDER BY created_at DESC LIMIT 1", (group_id,))
     tickets = [serialize_ticket(r) for r in db.q("SELECT * FROM tickets WHERE group_id=? ORDER BY key", (group_id,))]
     alerts = [serialize_alert(r) for r in db.q(
@@ -180,6 +205,7 @@ def workspace_state(group_id: str) -> dict:
     documents = db.rows_to_dicts(db.q(
         "SELECT d.*, u.display_name AS added_by FROM documents d LEFT JOIN users u ON u.id=d.user_id"
         " WHERE d.group_id=? ORDER BY d.created_at DESC", (group_id,)))
+    # How many alerts each source document raised (shown as 'N flags' on its card).
     for doc in documents:
         doc["label"] = KIND_LABEL.get(doc["kind"], "Document")
         doc["flags"] = db.q1(
@@ -226,17 +252,21 @@ def workspace_state(group_id: str) -> dict:
     }
 
 
+
 # ---------------------------------------------------------------- PM agent
 def extract_brief(group_id: str, actor_user_id: str, channel_id: str | None = None) -> tuple[dict, list[Event]]:
     """PM agent: draft (or redraft) the brief from the busiest channel."""
+    # Read the busiest channel only, so off-topic chatter in #general stays out of the brief.
     msgs = group_messages(group_id, channel_id or busiest_channel(group_id))
     if not msgs:
         raise ValueError("There are no group messages to read yet.")
+    # LangGraph planning graph: pm_brief -> pm_tickets (see app/agents.py).
     state = agents.run_plan_pipeline(msgs, [user_name(u) for u in members_of(group_id)])
     draft = BriefDraft.model_validate(state["brief"])
     content = draft.to_markdown()
     existing = db.q1("SELECT * FROM briefs WHERE group_id=? ORDER BY created_at DESC LIMIT 1", (group_id,))
     ts = db.now()
+    # Redrafting replaces an unapproved draft; an approved brief is never overwritten.
     if existing and existing["status"] != "approved":
         db.ex("UPDATE briefs SET content=?, updated_at=? WHERE id=?", (content, ts, existing["id"]))
         bid = existing["id"]
@@ -252,6 +282,8 @@ def extract_brief(group_id: str, actor_user_id: str, channel_id: str | None = No
     return brief, [("brief", brief), ("activity", act)]
 
 
+# Tickets drafted together with the brief wait here (in memory) until the brief is
+# approved, so proposing them later doesn't cost a second AI call.
 _proposal_cache: dict[str, list[dict]] = {}
 
 
@@ -300,6 +332,7 @@ def propose_tickets(group_id: str) -> tuple[list[dict], list[Event]]:
     msgs = group_messages(group_id, busiest_channel(group_id))
     member_ids = members_of(group_id)
     names = {user_name(u): u for u in member_ids}
+    # Use the tickets drafted with the brief if we have them; otherwise ask the PM agent now.
     proposals = _proposal_cache.pop(group_id, None)
     if proposals is None:
         ts_set, _ = agents.propose_tickets(brief["content"], msgs, list(names))
@@ -309,6 +342,8 @@ def propose_tickets(group_id: str) -> tuple[list[dict], list[Event]]:
     start = len(existing) + 1
     created: list[dict] = []
     ts = db.now()
+    # Skip near-duplicates of existing tasks; match the suggested owner to a member,
+    # or share the work out in turn.
     for i, p in enumerate(proposals):
         if any(agents.similarity(p["title"], e["title"]) > 0.8 for e in existing):
             continue
@@ -340,9 +375,11 @@ def approve_assignments(group_id: str, host_user_id: str) -> tuple[list[dict], l
     return tickets, [("tickets", tickets), ("activity", act)]
 
 
+
 # ------------------------------------------------- Architect agent / alerts
 def scan_message(group_id: str, message_id: str) -> tuple[dict | None, list[Event]]:
     """Run retrieval + Architect over one new message. Returns a new alert, if any."""
+    # Only real user messages are reviewed, each once, and never questions.
     msg = db.q1("SELECT * FROM group_messages WHERE id=? AND kind='user'", (message_id,))
     if not msg:
         return None, []
@@ -354,6 +391,8 @@ def scan_message(group_id: str, message_id: str) -> tuple[dict | None, list[Even
     corpus = chat_corpus(group_id, exclude_id=message_id) + claim_corpus(group_id)
     if not corpus:
         return None, []
+    # LangGraph review graph: retrieve the closest statements (embeddings + FAISS), then
+    # the Architect agent judges them in one batched call and keeps the most serious issue.
     state = agents.run_review_pipeline(msg["content"], corpus)
     verdict = state.get("verdict") or {}
     if not verdict or verdict.get("kind") in (None, "none"):
@@ -370,6 +409,7 @@ def _create_alert(group_id: str, verdict: dict, evidence_ids: list[str], texts: 
     `evidence_ids` are chat message ids or prefixed document-claim / task ids.
     Dependent tasks are retrieved against every evidence text and listed once.
     """
+    # 1. Save the alert itself (kind, severity, headline, explanation, resolution options).
     aid = db.new_id()
     db.ex(
         "INSERT INTO alerts (id, group_id, kind, severity, headline, explanation, status, options, created_at)"
@@ -377,6 +417,8 @@ def _create_alert(group_id: str, verdict: dict, evidence_ids: list[str], texts: 
         (aid, group_id, verdict["kind"], verdict.get("severity", "medium"), verdict["headline"][:140],
          verdict.get("explanation", ""), "open", json.dumps(verdict.get("options", [])), db.now()),
     )
+    # 2. Link the exact evidence: chat messages go to alert_sources; document
+    #    statements and tasks (prefixed ids) go to alert_evidence.
     for ref in evidence_ids:
         if ref.startswith(CLAIM):
             db.ex("INSERT OR IGNORE INTO alert_evidence (alert_id, ref_kind, ref_id) VALUES (?,?,?)",
@@ -387,6 +429,8 @@ def _create_alert(group_id: str, verdict: dict, evidence_ids: list[str], texts: 
         else:
             db.ex("INSERT OR IGNORE INTO alert_sources (alert_id, message_id) VALUES (?,?)", (aid, ref))
 
+    # 3. Dependent tasks: search the tasks with every evidence text; a task found more
+    #    than once is stored once (the dict keeps one entry per task).
     tickets = db.q("SELECT id, title, detail FROM tickets WHERE group_id=?", (group_id,))
     corpus_t = [(t["id"], f"{t['title']} {t['detail']}") for t in tickets]
     hits: dict[str, float] = {}
@@ -399,10 +443,12 @@ def _create_alert(group_id: str, verdict: dict, evidence_ids: list[str], texts: 
     db.exmany("INSERT OR IGNORE INTO alert_tickets (alert_id, ticket_id) VALUES (?,?)",
               [(aid, tid) for tid in hits])
 
+    # 4. Log it in Activity, and return the events that update every dashboard.
     alert = serialize_alert(db.q1("SELECT * FROM alerts WHERE id=?", (aid,)))
     act = db.log_activity(group_id, actor, alert["headline"], alert["impact_label"],
                           ref_kind="alert", ref_id=aid)
     return alert, [("alert", alert), ("activity", act)]
+
 
 
 # ------------------------------------------- sources: PRDs, bug tickets, meetings
@@ -413,6 +459,7 @@ def add_document(group_id: str, user_id: str, kind: str, title: str, content: st
     (for bug tickets) the existing tasks. PM: blockers are flagged, and a new bug
     ticket is triaged into a proposed task unless it duplicates one.
     """
+    # 1. Save the document and split it into statements ('claims') the agents can compare.
     did = db.new_id()
     db.ex("INSERT INTO documents (id, group_id, kind, title, content, user_id, created_at) VALUES (?,?,?,?,?,?,?)",
           (did, group_id, kind, title, content, user_id, db.now()))
@@ -427,6 +474,8 @@ def add_document(group_id: str, user_id: str, kind: str, title: str, content: st
         group_id, user_name(user_id), f"Added a {label.lower()}", title, actor_kind="user",
         ref_kind="document", ref_id=did))]
 
+    # 2. What each statement is compared with: the chat and the other documents
+    #    (and, for bug tickets, earlier bug reports and fix tasks).
     corpus = chat_corpus(group_id) + claim_corpus(group_id, exclude_document=did)
     targets: list[str] = []
     if kind == "bug":
@@ -437,10 +486,12 @@ def add_document(group_id: str, user_id: str, kind: str, title: str, content: st
         fix_tasks = [(i, t) for i, t in ticket_corpus(group_id) if t.startswith("Fix:")]
         corpus += fix_tasks
         targets += [i for i, _ in fix_tasks]
+    # 3. LangGraph source-review graph: split -> retrieve -> Architect -> PM blockers -> PM triage.
     state = agents.run_source_review(kind, title, content, corpus, targets)
     texts = dict(corpus)
     alerts: list[dict] = []
 
+    # 4. Conflicts become alerts, one per statement, quoting every line they disagree with.
     findings = [f for f in state.get("findings", []) if f["kind"] != "duplicate"]
     dups = [f for f in state.get("findings", []) if f["kind"] == "duplicate"]
     if dups:      # one duplicate report is one flag, however many of its statements match
@@ -457,6 +508,8 @@ def add_document(group_id: str, user_id: str, kind: str, title: str, content: st
         alerts.append(alert)
         events += evs
 
+    # 5. Blockers found by the PM agent become high-severity alerts, linked to the
+    #    statement in the document that says it.
     for b in state.get("blockers", []):
         statement = b["statement"]
         best = max(claims, key=lambda c: agents.similarity(c, statement))
@@ -472,6 +525,8 @@ def add_document(group_id: str, user_id: str, kind: str, title: str, content: st
         alerts.append(alert)
         events += evs
 
+    # 6. A new bug ticket becomes a proposed 'Fix:' task for the host, unless it
+    #    repeats an earlier bug report.
     triage = state.get("triage") or {}
     duplicate_task = any(f["kind"] == "duplicate" for f in state.get("findings", []))
     if kind == "bug" and triage and not duplicate_task:
@@ -481,6 +536,7 @@ def add_document(group_id: str, user_id: str, kind: str, title: str, content: st
             proposer="PM agent", review=False)
         events += evs
 
+    # 7. Summarise the check in Activity and refresh the Sources section.
     doc = dict(db.q1("SELECT * FROM documents WHERE id=?", (did,)))
     doc.update(label=label, claims=claims, triage=triage, flags=len(alerts))
     events.append(("activity", db.log_activity(
@@ -506,6 +562,7 @@ def get_document(group_id: str, document_id: str) -> dict | None:
     return doc
 
 
+
 # ------------------------------------------------------- task submissions
 def create_ticket(group_id: str, user_id: str | None, title: str, detail: str, priority: str,
                   hours: float, owner_user_id: str | None, *, proposer: str | None = None,
@@ -517,6 +574,7 @@ def create_ticket(group_id: str, user_id: str | None, title: str, detail: str, p
     """
     existing = ticket_corpus(group_id)
     tid = db.new_id()
+    # Next free task key (T-1, T-2, ...).
     key = f"T-{len(existing) + 1}"
     while db.q1("SELECT 1 FROM tickets WHERE group_id=? AND key=?", (group_id, key)):
         key = f"T-{int(key[2:]) + 1}"
@@ -529,6 +587,7 @@ def create_ticket(group_id: str, user_id: str | None, title: str, detail: str, p
         group_id, who, f"Proposed {key}", f"{title} · waiting for the host to approve",
         actor_kind="agent" if proposer else "user", ref_kind="ticket", ref_id=tid))]
 
+    # The Architect checks the new task against existing tasks so the same work isn't added twice.
     if review and existing:
         text = f"{title}. {detail}".strip(". ")
         state = agents.run_review_pipeline(text, existing)
@@ -543,6 +602,7 @@ def create_ticket(group_id: str, user_id: str | None, title: str, detail: str, p
     return ticket, events
 
 
+# ---------------------------------------------------------------- host decisions
 def dismiss_alert(group_id: str, alert_id: str, host_user_id: str, reason: str) -> tuple[dict, list[Event]]:
     """Host marks a flag as a false alert: no decision is recorded and no task changes (slide 11)."""
     row = db.q1("SELECT * FROM alerts WHERE id=? AND group_id=?", (alert_id, group_id))
@@ -573,6 +633,7 @@ def resolve_alert(group_id: str, alert_id: str, host_user_id: str, resolution: s
     if row["status"] != "open":
         raise ValueError("That alert is already closed.")
     ts = db.now()
+    # Close the alert and record the host's choice as a decision linked to it.
     db.ex("UPDATE alerts SET status='resolved', resolution=?, resolved_by=?, resolved_at=? WHERE id=?",
           (resolution, host_user_id, ts, alert_id))
 
@@ -628,6 +689,7 @@ def update_ticket(group_id: str, ticket_id: str, patch: dict, user_id: str) -> t
         if col in patch and patch[col] is not None:
             fields.append(f"{col}=?")
             values.append(patch[col])
+    # A new estimate needs the team to confirm it again.
     if "estimated_hours" in patch and patch["estimated_hours"] is not None:
         fields += ["estimated_hours=?", "hours_confirmed=0"]
         values.append(float(patch["estimated_hours"]))

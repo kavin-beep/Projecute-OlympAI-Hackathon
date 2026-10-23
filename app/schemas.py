@@ -1,15 +1,23 @@
 """Pydantic schemas. Every AI JSON output is validated against one of these."""
+# How to read this file
+# ---------------------
+# Each class is the exact JSON shape one agent must return. app/llm.py sends the
+# schema to the model and validates the reply; a reply that doesn't fit (wrong type,
+# unknown label, empty title) is rejected and the model is asked to correct it.
+
 from __future__ import annotations
 
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+# The only values these fields may take; anything else fails validation.
 Priority = Literal["Low", "Medium", "High"]
 FlagKind = Literal["duplicate", "contradiction", "assumption", "unclear", "none"]
 Severity = Literal["low", "medium", "high"]
 
 
+# ---------------------------------------------------------------- PM agent
 class BriefDraft(BaseModel):
     """The project brief the PM agent drafts."""
     title: str = Field(min_length=1, max_length=120)
@@ -53,6 +61,7 @@ class TicketSet(BaseModel):
     tickets: list[TicketProposal] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------- Architect agent
 class ArchitectVerdict(BaseModel):
     """The Architect agent's verdict on two statements, with resolution options."""
     kind: FlagKind
@@ -72,11 +81,13 @@ class ArchitectBatch(BaseModel):
     verdicts: list[NumberedVerdict] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------- QA agent
 class AcceptanceCriteria(BaseModel):
     """Acceptance criteria the QA agent writes for a ticket."""
     criteria: list[str] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------- innovations
 class FuturesComparison(BaseModel):
     """Result of comparing Parallel Futures answers."""
     summary: str = ""
@@ -91,6 +102,7 @@ class UnitTestVerdict(BaseModel):
     differences: list[str] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------- source documents
 class Blocker(BaseModel):
     """Something that stops or delays planned work, found in a source document."""
     statement: str = Field(min_length=1)

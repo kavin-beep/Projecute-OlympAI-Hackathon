@@ -7,6 +7,15 @@ fails after the retries, chat replies ask the user to try again and agent steps
 use the built-in rules for that one step. Demo mode is only for runs without a key.
 The API key is never printed, logged or returned to the client.
 """
+# How to read this file
+# ---------------------
+# One shared object, `llm` (bottom of the file), is used by the whole app:
+#   llm.complete(...)   -> a full text answer       (group AI replies)
+#   llm.stream(...)     -> text pieces as they come (individual chat)
+#   llm.structured(...) -> a validated Pydantic object (every agent in app/agents.py)
+# Reliability: answers are cached; rate limits switch to the backup model or wait;
+# timeouts back off and retry; invalid JSON is sent back to the model to correct.
+
 from __future__ import annotations
 
 import hashlib
@@ -23,6 +32,7 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
+# ---------------------------------------------------------------- settings
 DEFAULT_MODEL = "openai/gpt-oss-120b"          # OpenAI open-weight model, served by Groq
 DEFAULT_FALLBACK_MODEL = "openai/gpt-oss-20b"  # smaller OpenAI model with its own Groq limits
 MAX_RETRIES = 3          # attempts to get JSON that validates
@@ -52,6 +62,7 @@ def _load_dotenv() -> None:
             os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
+# Load .env as soon as this module is imported, before the LLM object reads the key.
 _load_dotenv()
 
 
@@ -164,13 +175,16 @@ class LLM:
         AIUnavailable if the provider fails after every retry, so callers can ask
         the user to try again instead of showing a demo answer.
         """
+        # 1. Same question asked before? Return the cached answer (saves tokens).
         key = _hash(self.model, messages, temperature)
         if cache:
             hit = _cache.get(key)
             if hit is not None:
                 return hit
+        # 2. No key configured: the labelled demo answer.
         if self.mode != "live":
             return (mock or (lambda: demo_answer(_last_question(messages))))()
+        # 3. Ask the provider (with retries); cache and return the answer.
         text = self._call_with_backoff(messages, temperature, max_tokens)
         if text is None:
             raise AIUnavailable(self._degraded_reason or "AI provider unavailable")
@@ -192,6 +206,7 @@ class LLM:
         sent after every retry, the user is asked to try again (never a demo answer).
         """
         if self.mode == "live":
+            # Live: try up to TRANSPORT_RETRIES times, each time with the best available model.
             delay = 1.0
             for attempt in range(TRANSPORT_RETRIES):
                 model = self._models()[0]
@@ -221,6 +236,7 @@ class LLM:
                         delay *= 2
             yield BUSY_MESSAGE
             return
+        # No key: send the demo answer word by word so it looks like streaming.
         text = (mock or (lambda: demo_answer(_last_question(messages))))()
         for part in re.findall(r"\S+\s*", text):
             yield part
@@ -246,11 +262,13 @@ class LLM:
         if self.mode != "live":
             return schema.model_validate(mock()), "mock"
 
+        # Tell the model the exact JSON shape (from the Pydantic schema) it must return.
         shape = json.dumps(schema.model_json_schema(), separators=(",", ":"))
         msgs = [
             {"role": "system", "content": f"{system}\n\nReply with JSON only, matching this schema:\n{shape}"},
             {"role": "user", "content": user},
         ]
+        # Up to MAX_RETRIES tries: parse and validate; on failure, show the model its error.
         last_error = ""
         for _attempt in range(MAX_RETRIES):
             raw = self._call_with_backoff(msgs, temperature, max_tokens, json_mode=True)
@@ -273,6 +291,8 @@ class LLM:
         self, messages: list[dict], temperature: float, max_tokens: int, json_mode: bool = False
     ) -> str | None:
         """Call Groq, switching to the backup model on rate limits and backing off on timeouts."""
+        # Rate limit: switch to the other model if it is free, else wait (at most
+        # MAX_WAIT_PER_TRY). Timeout / connection / server error: exponential backoff.
         delay = 1.0
         for attempt in range(TRANSPORT_RETRIES):
             model = self._models()[0]
@@ -298,6 +318,7 @@ class LLM:
         return None
 
 
+# ---------------------------------------------------------------- helpers
 def _retry_after(exc: Exception) -> float:
     """Seconds until a rate limit frees up, from Groq's header or message (default 30 s)."""
     headers = getattr(getattr(exc, "response", None), "headers", None) or {}
@@ -351,4 +372,5 @@ def demo_answer(question: str) -> str:
     )
 
 
+# The single shared instance imported everywhere (`from .llm import llm`).
 llm = LLM()

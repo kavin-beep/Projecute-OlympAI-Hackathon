@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import agents, retrieval  # noqa: E402
 from app.llm import llm  # noqa: E402
 
+# Input built by fetch_github_issues.py, and where the measured results are saved.
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "github_issues_golang.json")
 RESULTS = DATA.replace(".json", "_results.json")
 
@@ -72,6 +73,7 @@ def labelled_pairs(pairs: list[dict], seed: int = 7) -> list[tuple[dict, dict, i
 
 def eval_dedup(pairs: list[tuple[dict, dict, int]], live_limit: int) -> dict:
     """De-duplication by the retrieval search alone and by the Architect agent."""
+    # Search alone: try every cut-off from 0.20 to 0.90 and keep the scores of each.
     sims = [(retrieval.similarity(text_of(a), text_of(b)), y) for a, b, y in pairs]
     sweep = {}
     for t in [x / 100 for x in range(20, 91, 5)]:
@@ -96,6 +98,7 @@ def eval_dedup(pairs: list[tuple[dict, dict, int]], live_limit: int) -> dict:
            "search_fixed_threshold": {"threshold": fixed_t, **sweep[min(sweep, key=lambda t: abs(t - fixed_t))]},
            "search_best_threshold": {"threshold": best_t, **sweep[best_t]},
            "architect_rules": None, "architect_live": None}
+    # Architect agent: the built-in rules always; the live model too when asked (--live).
     mode = llm.mode
     if mode == "live":
         llm._client, saved = None, llm._client            # rules first, without the model
@@ -170,6 +173,7 @@ def eval_clusters(pair_list: list[dict], fixed: float) -> dict:
                 fn += same_t and not same_p
         return {"threshold": t, "found_groups": len(set(pred.values())), **prf(tp, fp, fn)}
 
+    # Score every cut-off and report both the fixed one and the best one found here.
     sweep = [score_at(x / 100) for x in range(30, 96, 5)]
     best = max(sweep, key=lambda r: r["f1"])
     return {"issues": len(nums), "true_groups": len(set(truth.values())),
@@ -220,6 +224,7 @@ def main() -> None:
     print(f"  Search backend:   {retrieval.backend_label()}")
     print(f"  AI mode:          {llm.status()['label']}\n")
 
+    # Run each measurement, then print the report and save it next to the data.
     report = {"source": data["source"], "backend": retrieval.backend_label(),
               "dedup": eval_dedup(labelled, args.live), "search": eval_search(pair_list)}
     report["clusters"] = eval_clusters(pair_list, report["dedup"]["search_fixed_threshold"]["threshold"])

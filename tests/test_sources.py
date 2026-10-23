@@ -1,11 +1,15 @@
 """Cross-checking PRDs, bug tickets and meeting summaries (challenge brief), plus
 task submissions, false-alert dismissal, decision impact and the event log.
 """
+# Each test's name states the rule it checks. Run this file alone with:
+#   python -m pytest -q tests/test_sources.py
+
 from __future__ import annotations
 
 from app import db
 from tests.conftest import auth, login
 
+# Sample documents (synthetic, written for these tests).
 PRD = """# Checkout PRD
 Goals:
 - Every customer must create an account and log in before checkout.

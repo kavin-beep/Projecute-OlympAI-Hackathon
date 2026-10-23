@@ -3,8 +3,9 @@
 import { api, stream, state } from './api.js';
 import { $, autoGrow, clear, el, emptyState, icon, markdown, skeleton, toast } from './ui.js';
 
-// Start a new individual chat.
+// Build one private chat surface (thread, input, send button) on the chat API.
 export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, titleEl, onAfterReply, placeholderTitle }) {
+  // This surface's state: the open chat, its messages, and whether a reply is streaming.
   let chat = null;
   let messages = [];
   let busy = false;
@@ -13,6 +14,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
 
   function scrollDown() { scrollEl.scrollTop = scrollEl.scrollHeight; }
 
+  // One turn: the user's bubble, or Projecute's answer rendered as Markdown.
   function renderTurn(msg) {
     const turn = el('div', { class: `turn ${msg.role}` });
     if (msg.role === 'user') {
@@ -26,6 +28,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
     return turn;
   }
 
+  // Redraw the whole thread (or a welcome message when nothing is open yet).
   function render() {
     clear(threadEl);
     if (!chat) {
@@ -52,6 +55,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
     scrollDown();
   }
 
+  // Open an existing chat, or create a new one.
   async function open(chatId) {
     threadEl.replaceChildren(skeleton(4));
     const data = await api(`/chats/${chatId}`);
@@ -69,6 +73,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
     return chat;
   }
 
+  // Send the typed message and stream the answer in as it is written.
   async function send() {
     const text = inputEl.value.trim();
     if (!text || busy) return;
@@ -78,6 +83,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
     inputEl.value = '';
     inputEl.style.height = 'auto';
 
+    // Show the user's message at once, with a loading placeholder for the answer.
     if (threadEl.querySelector('.empty')) clear(threadEl);
     threadEl.append(renderTurn({ role: 'user', content: text }));
     const pending = el('div', { class: 'turn assistant' },
@@ -88,6 +94,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
     let answer = '';
     let host = null;
     try {
+      // 'delta' events add text as it arrives; 'done' carries the saved full answer.
       await stream(`/chats/${chat.id}/messages`, { content: text }, (ev) => {
         if (ev.type === 'delta') {
           answer += ev.text;
@@ -112,12 +119,14 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
     }
   }
 
+  // Enter sends; Shift+Enter adds a new line.
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
   sendEl.addEventListener('click', send);
   sendEl.replaceChildren(icon('send', 16));
 
+  // What app.js can do with this chat surface.
   return {
     render,
     open,
@@ -142,6 +151,7 @@ export function renderChatList({ container, chats, activeId, onOpen, onRename, o
     }));
     return;
   }
+  // Group the chats by date (Today, Yesterday, ...), each with rename and delete buttons.
   const buckets = new Map();
   for (const c of visible) {
     const key = bucketOf(c.updated_at);

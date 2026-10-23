@@ -25,6 +25,7 @@ import os
 import sys
 import tempfile
 
+# Use a throw-away database (set before app.db is imported), so the demo data is untouched.
 os.environ["PROJECUTE_DB"] = os.path.join(tempfile.mkdtemp(prefix="projecute-sim-"), "sim.db")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -70,6 +71,8 @@ def _task(gid: str, key: str, title: str, hours: float) -> str:
 
 def simulate(sid: str, planted: str, new: str, expected: str) -> dict:
     """Run one scenario end to end. Returns which steps passed (None = not applicable)."""
+    # Set up: the planted claim among distractors, a task that depends on it, an unrelated
+    # task, and then the new message.
     gid, cid, host, member = _team(sid)
     for d in DISTRACTORS[:3]:
         _say(gid, cid, host, d)
@@ -80,6 +83,7 @@ def simulate(sid: str, planted: str, new: str, expected: str) -> dict:
     _task(gid, "T-2", "Refresh the marketing site screenshots", 2)
     new_id = _say(gid, cid, host, new)
 
+    # 1. detect
     alert, _ = pipeline.scan_message(gid, new_id)
     got = alert["kind"] if alert else "none"
     res: dict = {"id": sid, "expected": expected, "got": got, **dict.fromkeys(STEPS)}
@@ -87,11 +91,13 @@ def simulate(sid: str, planted: str, new: str, expected: str) -> dict:
     if not alert:
         return res
 
+    # 2. evidence and 3. impact
     sources = {s["id"] for s in alert["sources"]}
     res["evidence"] = sources == {planted_id, new_id}
     keys = [t["key"] for t in alert["tickets"]]
     res["impact"] = keys.count("T-1") == 1 and len(keys) == len(set(keys)) and alert["confirmed_hours"] >= 6
 
+    # 4. resolve and 5. QA
     if alert["kind"] == "unclear":       # false-alert path: dismissed, no decision
         before = len(pipeline.workspace_state(gid)["decisions"])
         closed, _ = pipeline.dismiss_alert(gid, alert["id"], host, "They agree")
@@ -106,6 +112,7 @@ def simulate(sid: str, planted: str, new: str, expected: str) -> dict:
                           and dependent in {t["id"] for t in decision["tickets"]})
         affected = {t["id"] for t in alert["tickets"]}
         res["qa"] = all(t["acceptance_criteria"] for t in state["tickets"] if t["id"] in affected)
+    # 6. closed: resolving the same alert twice must fail.
     try:
         pipeline.resolve_alert(gid, alert["id"], host, "again")
         res["closed"] = False

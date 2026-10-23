@@ -24,6 +24,7 @@ import urllib.error
 import urllib.request
 from collections import Counter
 
+# Which repository is read, where the file is saved, and the credit stored with the data.
 REPO = "golang/go"
 API = "https://api.github.com"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "github_issues_golang.json")
@@ -32,6 +33,7 @@ ATTRIBUTION = (
     "collected through GitHub's public API. The text belongs to the people who wrote those issues; "
     "it is used here only to evaluate the Projecute prototype. Duplicate links are the Go "
     "maintainers' own 'Duplicate of #N' comments.")
+# The maintainers' comment that marks a duplicate, e.g. 'Duplicate of #12345'.
 DUP_RE = re.compile(r"(?i)\bduplicate of (?:golang/go)?#(\d+)")
 TRIAGE_QUERIES = {          # label -> what the PM agent's triage should say
     "FeatureRequest": "feature",
@@ -137,8 +139,11 @@ def main() -> None:
     args = ap.parse_args()
     data = _load()
 
+    # 1. Triage examples by label.
     _collect_triage(data)
 
+    # 2. Duplicate pairs: read each closed issue's comments for 'Duplicate of #N' and
+    #    fetch that original. Progress is saved after each issue, so the run can resume.
     candidates = _search('is:closed "Duplicate of" in:comments', pages=3)
     print(f"{len(candidates)} closed issues mention a duplicate; collecting pairs…", flush=True)
     done = {p["duplicate"]["number"] for p in data["pairs"]} | set(data["checked"])

@@ -1,4 +1,17 @@
 """Projecute — FastAPI app: HTTP API, WebSockets and the static frontend."""
+# How to read this file
+# ---------------------
+# This is the HTTP API. Every endpoint follows the same pattern:
+#   1. find out who is calling (`user: dict = User`) and check what they may do
+#      (require_member / require_host), so the server, not the browser, enforces roles;
+#   2. validate the input (lengths, allowed values);
+#   3. do the work in the agent pipeline (app/pipeline.py) or the database (app/db.py);
+#   4. push live updates to every member's open windows (broadcast over WebSockets);
+#   5. return JSON.
+# Sections, in order: app setup, sign-in, permission helpers, 1. individual chat,
+# 3. individual workspace, 2. group chat, 4. group workspace (brief, tasks, alerts,
+# sources, Parallel Futures, Human Unit Test), demo reset and live updates, static files.
+
 from __future__ import annotations
 
 import asyncio
@@ -25,10 +38,14 @@ from . import agents, db, media, pipeline, retrieval
 from .llm import BUSY_MESSAGE, AIUnavailable, llm
 from .ws import hub
 
+# ---------------------------------------------------------------- app setup
+# Paths: the project root, and the folder holding the browser frontend.
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC = os.path.join(ROOT, "static")
 
 
+# Runs once when the server starts: create tables, and on an empty database
+# stage the demo team so the app is usable straight away.
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Create the database tables when the server starts, and stage the demo on a fresh database."""
@@ -40,6 +57,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+# The application object. Automatic API docs pages are switched off for the demo.
 app = FastAPI(title="Projecute", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 
@@ -47,6 +65,8 @@ app = FastAPI(title="Projecute", docs_url=None, redoc_url=None, lifespan=lifespa
 def current_user(authorization: str | None = Header(default=None),
                  x_token: str | None = Header(default=None, alias="X-Token")) -> dict:
     """Resolve the signed-in user from the X-Token / Bearer header, or reject with 401."""
+    # The browser sends the session token in an X-Token header; a standard
+    # 'Authorization: Bearer <token>' header also works.
     token = x_token
     if not token and authorization and authorization.lower().startswith("bearer "):
         token = authorization[7:]
@@ -58,6 +78,8 @@ def current_user(authorization: str | None = Header(default=None),
     return dict(row)
 
 
+# Shortcut used in endpoint signatures (`user: dict = User`): FastAPI runs
+# current_user before the endpoint, so a request without a valid session never reaches it.
 User = Depends(current_user)
 
 
@@ -76,6 +98,7 @@ def login(payload: dict = Body(...)) -> dict:
     row = db.q1("SELECT * FROM users WHERE username=?", (username,))
     if not row:
         raise HTTPException(404, "No such user in this demo. Use the Load demo button first.")
+    # A random, unguessable session token, stored so later requests map back to this user.
     token = secrets.token_urlsafe(24)
     db.ex("INSERT INTO sessions (token, user_id, created_at) VALUES (?,?,?)", (token, row["id"], db.now()))
     return {"token": token, "user": _public_user(dict(row))}
@@ -113,6 +136,8 @@ async def broadcast(group_id: str, events: list[tuple[str, Any]]) -> None:
         await hub.send_users(members, event, {"group_id": group_id, "data": payload})
 
 
+# Permission checks used by every group endpoint. They raise an HTTP error, which
+# FastAPI turns into a 403/404 response, so code below a check only runs for the right people.
 def require_member(group_id: str, user: dict) -> None:
     """Reject with 403 unless the user is in the group."""
     if not db.is_member(group_id, user["id"]):
@@ -140,6 +165,7 @@ def _check_length(text: str, limit: int, what: str) -> None:
 
 def _validate_ticket_patch(group_id: str, patch: dict) -> None:
     """Check a host's task edit before it is saved (400 with a plain message if invalid)."""
+    # Each field is checked only if it is part of the edit; valid values are cleaned in place.
     if "title" in patch and patch["title"] is not None:
         title = str(patch["title"]).strip()
         if not title:
@@ -177,6 +203,8 @@ def require_group_message(group_id: str, message_id: str) -> None:
 
 
 # ================================================================ 1. Individual chat
+# Private conversations with Projecute AI. Every query filters by the signed-in
+# user's id, so nobody can read another person's chats.
 @app.get("/api/chats")
 def list_chats(surface: str = Query("chat"), user: dict = User) -> dict:
     """The user's own individual chats, newest first."""
@@ -234,6 +262,10 @@ def delete_chat(chat_id: str, user: dict = User) -> dict:
     db.ex("DELETE FROM chats WHERE id=?", (chat_id,))
     return {"ok": True}
 
+
+# ---------------------------------------------------------------- AI instructions
+# The system prompts below are sent to the language model with every request. They
+# set its identity (Projecute AI), what it knows about the app, and how it behaves.
 
 # Who the assistant says it is. Without this, the underlying model introduces
 # itself by its own product name. It stays honest about the model if asked.
@@ -299,6 +331,7 @@ async def send_chat_message(chat_id: str, payload: dict = Body(...), user: dict 
     if not content:
         raise HTTPException(400, "Write a message first.")
     ts = db.now()
+    # 1. Save the user's message; a brand-new chat takes its title from the first words.
     umid = db.new_id()
     db.ex("INSERT INTO chat_messages (id, chat_id, role, content, created_at) VALUES (?,?,?,?,?)",
           (umid, chat_id, "user", content, ts))
@@ -306,11 +339,14 @@ async def send_chat_message(chat_id: str, payload: dict = Body(...), user: dict 
         db.ex("UPDATE chats SET title=? WHERE id=?", (content[:48], chat_id))
     db.ex("UPDATE chats SET updated_at=? WHERE id=?", (ts, chat_id))
 
+    # 2. What the AI sees: the instructions plus the last 20 messages of this chat only.
     history = db.q("SELECT role, content FROM chat_messages WHERE chat_id=? ORDER BY created_at", (chat_id,))
     messages = [{"role": "system", "content": CHAT_SYSTEM}] + [
         {"role": r["role"], "content": r["content"]} for r in history
     ][-20:]
 
+    # 3. Stream the answer back piece by piece as server-sent events (SSE). The AI call
+    #    blocks, so it runs in a worker thread and passes each piece here through a queue.
     async def gen():
         """Server-sent event stream: the user message id, text deltas, then the saved reply."""
         yield _sse({"type": "user_message", "id": umid, "created_at": ts})
@@ -333,6 +369,7 @@ async def send_chat_message(chat_id: str, payload: dict = Body(...), user: dict 
                 break
             chunks.append(piece)
             yield _sse({"type": "delta", "text": piece})
+        # 4. Streaming finished: save the full answer.
         answer = "".join(chunks)
         amid = db.new_id()
         # The chat may have been deleted while the answer was streaming; then there is nothing to save.
@@ -342,6 +379,7 @@ async def send_chat_message(chat_id: str, payload: dict = Body(...), user: dict 
             db.ex("UPDATE chats SET updated_at=? WHERE id=?", (db.now(), chat_id))
         yield _sse({"type": "done", "id": amid, "content": answer})
 
+    # The browser reads this stream with fetch() and shows each piece as it arrives.
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
@@ -352,6 +390,8 @@ def _sse(obj: dict) -> str:
 
 
 # ================================================================ 3. Individual workspace
+# Named items (content, email draft, code, image, audio) in personal projects.
+# Items stay private to their owner until the owner shares them into a group.
 @app.get("/api/projects")
 def list_projects(user: dict = User) -> dict:
     """The user's personal projects (folders for workspace items)."""
@@ -373,6 +413,8 @@ def create_project(payload: dict = Body(...), user: dict = User) -> dict:
 @app.get("/api/items")
 def list_items(project_id: str | None = None, q: str | None = None, user: dict = User) -> dict:
     """The user's workspace items, filtered by project and name search."""
+    # Only the signed-in user's own items. Filters are added with ? placeholders (values
+    # are never pasted into the SQL text), which prevents SQL injection.
     sql = "SELECT * FROM items WHERE owner_user_id=?"
     params: list[Any] = [user["id"]]
     if project_id:
@@ -392,6 +434,8 @@ def get_item(item_id: str, user: dict = User) -> dict:
     if not row:
         raise HTTPException(404, "Item not found.")
     item = dict(row)
+    # Someone else's item is readable only once it is shared into a group this user is in;
+    # otherwise answer 404, exactly as if it didn't exist.
     if item["owner_user_id"] != user["id"]:
         shared = item["shared_group_id"]
         if not (shared and db.is_member(shared, user["id"])):
@@ -399,6 +443,7 @@ def get_item(item_id: str, user: dict = User) -> dict:
     return {"item": item}
 
 
+# Instructions for each text item type the workspace can generate.
 ITEM_PROMPTS = {
     "content": "You write clear, useful content. Return Markdown only, no preamble.",
     "email": "You write short professional emails. Return a Subject line then the body.",
@@ -415,6 +460,7 @@ async def generate_item(payload: dict = Body(...), user: dict = User) -> dict:
     _check_length(prompt, MAX_MESSAGE, "The description of what to generate")
     project_id = payload.get("project_id")
     chat_id = payload.get("chat_id")
+    # Validate the request before spending any AI tokens.
     if not name:
         raise HTTPException(400, "Name the item so you can find it later.")
     if kind not in ("content", "email", "code", "image", "audio"):
@@ -426,6 +472,8 @@ async def generate_item(payload: dict = Body(...), user: dict = User) -> dict:
     if chat_id and not db.q1("SELECT 1 FROM chats WHERE id=? AND user_id=?", (chat_id, user["id"])):
         chat_id = None
 
+    # Generate the item: text types call the AI; images are a labelled placeholder drawn
+    # locally (app/media.py); audio gets an AI-written script that the browser reads aloud.
     body, language, data_url, generator = "", None, None, "live"
     try:
         if kind in ("content", "email", "code"):
@@ -449,6 +497,7 @@ async def generate_item(payload: dict = Body(...), user: dict = User) -> dict:
     except AIUnavailable as exc:      # never save a half-made item; ask the user to try again
         raise HTTPException(503, BUSY_MESSAGE) from exc
 
+    # Save the item, linked to its project and to the chat it came from (if any).
     iid = db.new_id()
     ts = db.now()
     db.ex(
@@ -465,6 +514,8 @@ def update_item(item_id: str, payload: dict = Body(...), user: dict = User) -> d
     row = db.q1("SELECT * FROM items WHERE id=? AND owner_user_id=?", (item_id, user["id"]))
     if not row:
         raise HTTPException(404, "Item not found.")
+    # Only these editable columns are accepted. Column names come from this fixed list;
+    # the values go in as ? parameters.
     fields, values = [], []
     for col in ("name", "body", "language"):
         if col in payload and payload[col] is not None:
@@ -493,6 +544,8 @@ async def share_item(item_id: str, payload: dict = Body(...), user: dict = User)
     row = db.q1("SELECT * FROM items WHERE id=? AND owner_user_id=?", (item_id, user["id"]))
     if not row:
         raise HTTPException(404, "Item not found.")
+    # Sharing is explicit (deck slide 14): the owner picks a group they belong to, and
+    # the item then appears under Team outputs for that group.
     group_id = payload.get("group_id")
     if not group_id or not db.is_member(group_id, user["id"]):
         raise HTTPException(403, "You can only share into a group you are in.")
@@ -519,6 +572,9 @@ async def unshare_item(item_id: str, user: dict = User) -> dict:
 
 
 # ================================================================ 2. Group chat
+# Channels, messages, reactions, the typing indicator, and two AI modes: public
+# answers (posted for everyone) and private help (only the asker sees the answer;
+# the group sees just a 'used AI' notice).
 @app.get("/api/groups")
 def my_groups(user: dict = User) -> dict:
     """Groups the user belongs to."""
@@ -538,6 +594,7 @@ def group_detail(group_id: str, user: dict = User) -> dict:
     members = db.rows_to_dicts(db.q(
         "SELECT u.id, u.username, u.display_name, u.accent, m.role FROM group_members m"
         " JOIN users u ON u.id=m.user_id WHERE m.group_id=? ORDER BY m.role, u.display_name", (group_id,)))
+    # 'Online' means the person has at least one open browser window (an open WebSocket).
     online = hub.online()
     for m in members:
         m["online"] = m["id"] in online
@@ -550,6 +607,7 @@ def group_detail(group_id: str, user: dict = User) -> dict:
 async def group_settings(group_id: str, payload: dict = Body(...), user: dict = User) -> dict:
     """Host only: switch public AI answers and private AI help on or off."""
     require_host(group_id, user)
+    # Host-only switches for who can use AI in this group; each change is logged in Activity.
     fields, values, notes = [], [], []
     for col, label in (("allow_public_ai", "Public AI answers"), ("allow_private_ai", "Private AI help")):
         if col in payload:
@@ -589,6 +647,8 @@ def _reactions(message_id: str) -> list[dict]:
     return [{"emoji": r["emoji"], "count": r["n"], "users": (r["users"] or "").split(",")} for r in rows]
 
 
+# The group assistant gets the same identity and project knowledge, but only this
+# group's messages as context (see _group_context below).
 GROUP_AI_SYSTEM = IDENTITY + ABOUT_PROJECUTE + (
     "You are the group assistant in a team chat. You can only see this group's messages. "
     "Answer the question using that context. Be brief and concrete."
@@ -607,6 +667,7 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
         raise HTTPException(400, "Write a message first.")
     if payload.get("reply_to_id"):
         require_group_message(group_id, payload["reply_to_id"])
+    # The host can switch either AI mode off for the whole group.
     group = dict(db.q1("SELECT * FROM groups WHERE id=?", (group_id,)))
     if ai_mode == "public" and not group["allow_public_ai"]:
         raise HTTPException(403, "The host turned off public AI answers in this group.")
@@ -616,6 +677,8 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
     members = pipeline.members_of(group_id)
     result: dict[str, Any] = {}
 
+    # Private help: the answer goes only to the asker. The group gets a notice with the
+    # asker's name, but never the prompt, the answer or the topic.
     if ai_mode == "private":
         # Nothing about the prompt, the answer or the topic reaches the group.
         answer = await _group_answer(group_id, content)
@@ -633,6 +696,7 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
                 "notice": notice_row}
 
     ts = db.now()
+    # A normal (or public-AI) message: save it and push it to every member's windows.
     mid = db.new_id()
     db.ex("INSERT INTO group_messages (id, channel_id, group_id, user_id, kind, content, reply_to_id, created_at)"
           " VALUES (?,?,?,?,?,?,?,?)",
@@ -641,6 +705,7 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
     await hub.send_users(members, "group_message", {"group_id": group_id, "data": msg})
     result["message"] = msg
 
+    # Public AI: the assistant's answer is posted into the channel as a reply.
     if ai_mode == "public":
         answer = await _group_answer(group_id, content)
         aid = db.new_id()
@@ -701,6 +766,7 @@ async def react(group_id: str, message_id: str, payload: dict = Body(...), user:
     emoji = (payload.get("emoji") or "").strip()[:8]
     if not emoji:
         raise HTTPException(400, "Pick a reaction.")
+    # Clicking the same emoji again removes the reaction (a toggle).
     existing = db.q1("SELECT 1 FROM reactions WHERE message_id=? AND user_id=? AND emoji=?",
                      (message_id, user["id"], emoji))
     if existing:
@@ -731,6 +797,9 @@ def my_private_help(group_id: str, user: dict = User) -> dict:
 
 
 # ================================================================ 4. Group workspace
+# The shared plan: Brief, Sources, Tasks, Decisions, Alerts, Activity, Team outputs.
+# The agent logic lives in app/pipeline.py and app/agents.py; these endpoints check
+# permissions, call the pipeline, then broadcast the live events it returns.
 @app.get("/api/groups/{group_id}/workspace")
 def get_workspace(group_id: str, user: dict = User) -> dict:
     """Everything in the group workspace: brief, tasks, alerts, decisions, activity, outputs."""
@@ -804,6 +873,7 @@ async def ticket_create(group_id: str, payload: dict = Body(...), user: dict = U
     if not title:
         raise HTTPException(400, "Give the task a title.")
     _check_length((payload.get("detail") or "").strip(), MAX_SHORT, "Task details")
+    # Same rules as a host's edit: known priority, hours from 0.5 to 200, owner in the group.
     priority = payload.get("priority") or "Medium"
     if priority not in ("Low", "Medium", "High"):
         raise HTTPException(400, "Priority must be Low, Medium or High.")
@@ -1021,6 +1091,9 @@ async def unit_test(group_id: str, ticket_id: str, payload: dict = Body(...), us
     _check_length(description, MAX_SHORT, "Descriptions")
     if not description:
         raise HTTPException(400, "Describe the task in your own words.")
+    # Human Unit Test (deck slide 10): the task's assignee and its creator each describe
+    # the task in their own words. The first description creates the record; the other
+    # person fills in the second side.
     row = db.q1("SELECT * FROM unit_tests WHERE ticket_id=?", (ticket_id,))
     is_assignee = ticket["owner_user_id"] == user["id"]
     if not row:
@@ -1041,6 +1114,7 @@ async def unit_test(group_id: str, ticket_id: str, payload: dict = Body(...), us
             db.ex("UPDATE unit_tests SET creator_desc=?, creator_user_id=? WHERE id=?",
                   (description, user["id"], uid))
 
+    # Once both descriptions exist, the Architect agent compares them: match or mismatch.
     row = db.q1("SELECT * FROM unit_tests WHERE id=?", (uid,))
     if row["creator_desc"] and row["assignee_desc"]:
         verdict, _ = await asyncio.to_thread(
@@ -1056,6 +1130,8 @@ async def unit_test(group_id: str, ticket_id: str, payload: dict = Body(...), us
 
 
 # ================================================================ demo + ws
+# Reset the demo data (passcode-protected on the live site), and the WebSocket that
+# carries live updates to every open window.
 @app.post("/api/demo/load")
 async def load_demo(payload: dict = Body(default={})) -> dict:
     """Reset the database to the staged demo (needs the demo passcode when one is set)."""
@@ -1074,6 +1150,8 @@ async def load_demo(payload: dict = Body(default={})) -> dict:
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket, token: str = Query(default="")):
     """Live updates: one socket per signed-in browser window."""
+    # The browser connects to /ws?token=...; an unknown token is closed with code 4401
+    # (the WebSocket equivalent of HTTP 401).
     row = db.q1("SELECT user_id FROM sessions WHERE token=?", (token,))
     if not row:
         await ws.close(code=4401)
@@ -1082,6 +1160,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(default="")):
     await hub.connect(ws, user_id)
     try:
         await ws.send_json({"event": "ready", "payload": {"user_id": user_id}})
+        # Keep the socket open. The server only pushes events; messages from the browser are ignored.
         while True:
             await ws.receive_text()
     except WebSocketDisconnect:
@@ -1093,6 +1172,8 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(default="")):
 
 
 # ---------------------------------------------------------------- static
+# The frontend is plain HTML, CSS and JavaScript served as static files;
+# '/' returns the single page that loads them.
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

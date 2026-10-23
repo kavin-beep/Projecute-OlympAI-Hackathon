@@ -3,11 +3,14 @@
 # model does not fit in that memory; related-claim search then uses the TF-IDF
 # fallback, and the live Architect agent still makes every conflict decision.
 # Local runs and Docker use the full requirements.txt.
+# Web server: FastAPI app, Uvicorn server, WebSockets, data validation, form parsing.
 fastapi>=0.115
 uvicorn[standard]>=0.30
 websockets>=12
 pydantic>=2.7
 python-multipart>=0.0.9
+# AI: the Groq SDK (OpenAI gpt-oss models) and LangGraph (the agent graphs).
 groq>=0.11
 langgraph>=0.2
+# The TF-IDF related-claim search.
 numpy>=1.26

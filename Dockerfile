@@ -21,8 +21,10 @@ RUN pip install --no-cache-dir --user torch --index-url https://download.pytorch
 # Download the embedding model at build time so the first conflict check is fast.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 
+# Then the app code (secrets and local data are excluded by .dockerignore).
 COPY --chown=user . .
 RUN mkdir -p data
 
+# Listen on port 8000 and start the server.
 EXPOSE 8000
 CMD ["python", "main.py"]

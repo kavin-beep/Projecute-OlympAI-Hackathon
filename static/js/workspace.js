@@ -3,9 +3,11 @@
 import { api, state } from './api.js';
 import { $, clear, codeBlock, el, emptyState, icon, markdown, modal, relative, skeleton, toast } from './ui.js';
 
+// The five item types: their icons and display names.
 const KIND_ICON = { content: 'doc', email: 'mail', code: 'code', image: 'image', audio: 'audio' };
 const KIND_LABEL = { content: 'Content', email: 'Email draft', code: 'Code', image: 'Image', audio: 'Audio' };
 
+// The search box text and which item is open.
 let searchQuery = '';
 let openItemId = null;
 let chatRef = null;      // the workspace chat, for "from this chat" links
@@ -115,6 +117,7 @@ export async function openItem(itemId) {
     el('span', { class: 'kindtag' }, icon(KIND_ICON[item.kind], 12), KIND_LABEL[item.kind]),
     el('h4', {}, item.name)));
 
+  // Image and audio are placeholders today (future development), and say so.
   if (item.generator === 'mock' && (item.kind === 'image' || item.kind === 'audio')) {
     card.append(el('div', { class: 'meta', style: 'margin-bottom:10px;color:var(--medium)' },
       item.kind === 'image'
@@ -122,6 +125,7 @@ export async function openItem(itemId) {
         : 'Your browser reads the script aloud. Real audio generation will be enhanced and added in future development.'));
   }
 
+  // Show the item by type: image, audio (read aloud by the browser), code, or text.
   if (item.kind === 'image') {
     card.append(el('img', { class: 'gen', src: item.data_url, alt: item.name }));
     card.append(el('div', { class: 'meta', style: 'margin-top:8px' }, item.body));
@@ -245,6 +249,7 @@ export function newItemDialog(prefill = {}) {
   if (prefill.prompt) prompt.value = prefill.prompt;
   if (prefill.kind) kind.value = prefill.kind;
 
+  // A new item links back to the workspace chat it came from, if one is open.
   const fromChat = chatRef?.chat
     ? el('div', { class: 'meta' }, `This item will link back to "${chatRef.chat.title}".`)
     : null;
@@ -302,6 +307,7 @@ export function initWorkspace() {
   $('#itemSearch').addEventListener('input', (e) => { searchQuery = e.target.value; renderItems(); });
   $('#wsTogglePanel').addEventListener('click', () => $('#view-work').classList.add('panel'));
   $('#wsBackToChat').addEventListener('click', () => $('#view-work').classList.remove('panel'));
+  // On narrow screens the item panel and the chat take turns; these buttons switch.
   const sync = () => {
     const narrow = window.innerWidth <= 1180;
     $('#wsTogglePanel').style.display = narrow ? '' : 'none';

@@ -6,10 +6,12 @@ services:
     name: projecute
     runtime: python
     plan: free
+    # Install the light dependency set, start the server, and use /api/status as the health check.
     buildCommand: pip install -r requirements-render.txt
     startCommand: python main.py
     healthCheckPath: /api/status
     autoDeploy: true
+    # Settings passed to the app as environment variables (read by main.py and app/llm.py).
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

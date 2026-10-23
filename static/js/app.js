@@ -1,5 +1,8 @@
 // Shell: sign in, navigation, theme, settings, live wiring.
 
+// Sections, in order: theme, the two chat surfaces, navigation between the four areas,
+// settings, demo reset, sign-in, and boot (what runs when the page loads).
+
 import { api, closeSocket, connectSocket, on, setToken, state } from './api.js';
 import { $, avatar, clear, el, icon, modal, toast } from './ui.js';
 import { createChat, renderChatList } from './chat.js';
@@ -7,6 +10,7 @@ import * as group from './group.js';
 import * as workspace from './workspace.js';
 import * as board from './board.js';
 
+// The four areas on the left rail: [key, label, icon].
 const VIEWS = [
   ['chat', 'Individual chat', 'chat'],
   ['group', 'Group chat', 'group'],
@@ -17,6 +21,7 @@ let view = 'chat';
 let chatSearch = '';
 
 // ---------------------------------------------------------------- theme
+// Light or dark theme, remembered in this browser.
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('projecute_theme', theme);
@@ -27,6 +32,8 @@ $('#btnTheme').addEventListener('click', () =>
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
 
 // ---------------------------------------------------------------- chat surfaces
+// Both chat surfaces come from chat.js: the Individual chat page and the chat inside
+// My workspace (whose answers can be saved as named items).
 const mainChat = createChat({
   surface: 'chat',
   threadEl: $('#chatThread'), scrollEl: $('#chatScroll'),
@@ -53,6 +60,7 @@ const wsChat = createChat({
 });
 workspace.bindWorkspaceChat(wsChat);
 
+// Remember the last workspace prompt, so 'Save this as a named item' can reuse it.
 let lastWorkspacePrompt = '';
 $('#wsInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) lastWorkspacePrompt = $('#wsInput').value.trim();
@@ -100,6 +108,7 @@ $('#chatSearch').addEventListener('input', (e) => { chatSearch = e.target.value;
 $('#wsNewChat').addEventListener('click', () => wsChat.newChat());
 
 // ---------------------------------------------------------------- navigation
+// Draw the left rail, highlighting the active area.
 function renderRail() {
   const rail = clear($('#rail'));
   for (const [key, label, ic] of VIEWS) {
@@ -136,6 +145,8 @@ async function show(key) {
   } catch (err) { toast(err.message, 'err'); }
 }
 
+// Cross-links between areas: a flagged message opens the Shared workspace, and quoted
+// evidence in an alert jumps back to that message in the group chat.
 group.setAlertOpener(() => show('board'));
 board.setMessageJumper(async (messageId) => {
   const msg = (state.messages || []).find((m) => m.id === messageId);
@@ -151,10 +162,12 @@ board.setMessageJumper(async (messageId) => {
   $('#sidePanel').classList.remove('open');
 });
 
+// On narrow screens this button shows or hides the side panel of the current area.
 $('#btnMenu').replaceChildren(icon('board', 16));
 $('#btnMenu').addEventListener('click', () => $(`#view-${view}`).classList.toggle('panel'));
 
 // ---------------------------------------------------------------- settings
+// The 'Live AI' pill in the header.
 async function loadStatus() {
   try {
     state.status = await api('/status');
@@ -166,6 +179,7 @@ async function loadStatus() {
   } catch { /* status is cosmetic */ }
 }
 
+// Settings dialog: theme, sign out, and technical details under 'Advanced'.
 $('#btnSettings').replaceChildren(icon('gear', 16));
 $('#btnSettings').addEventListener('click', () => {
   const s = state.status || { ai: {}, retrieval: {}, agents: {} };
@@ -205,6 +219,7 @@ $('#btnSettings').addEventListener('click', () => {
 $('#userChip').addEventListener('click', () => $('#btnSettings').click());
 
 // ---------------------------------------------------------------- demo
+// 'Load demo' resets everything to the staged demo team.
 async function loadDemo(button) {
   const label = button.textContent;
   button.disabled = true;
@@ -235,6 +250,7 @@ $('#btnDemo').addEventListener('click', (e) => loadDemo(e.currentTarget));
 $('#gateDemo').addEventListener('click', (e) => loadDemo(e.currentTarget));
 
 // ---------------------------------------------------------------- sign in
+// The sign-in screen: pick one of the demo team members (no passwords in the prototype).
 async function showGate() {
   $('#app').classList.add('hidden');
   $('#gate').style.display = 'grid';
@@ -281,15 +297,18 @@ async function start() {
 // ---------------------------------------------------------------- boot
 $('#spClose').replaceChildren(icon('close', 16));
 $('#spClose').addEventListener('click', () => $('#sidePanel').classList.remove('open'));
+// Wire up every area once.
 group.initGroupComposer();
 group.initGroupLive();
 board.initBoardLive();
 workspace.initWorkspace();
 renderRail();
 
+// Live events handled by the shell.
 on('signed-out', () => { closeSocket(); showGate(); });
 on('ws:outputs', () => { if (view === 'work') workspace.loadWorkspace(); });
 
+// Restore the session if this tab already has a token; otherwise show sign-in.
 (async () => {
   if (state.token) {
     try {

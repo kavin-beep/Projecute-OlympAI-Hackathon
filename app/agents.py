@@ -8,6 +8,19 @@ Each agent asks the LLM for JSON, validates it with Pydantic, and falls back to
 a deterministic local heuristic when no provider key is present. The heuristics
 are real rules over the text — nothing about a specific demo is hard-coded.
 """
+# How to read this file
+# ---------------------
+# Sections, in order:
+#   1. Local heuristics - text rules used when no AI key is set (and as a safety net).
+#   2. PM agent        - chat -> project brief -> proposed tickets.
+#   3. Architect agent - compares two statements: contradiction / assumption / duplicate.
+#   4. QA agent        - acceptance criteria after a decision.
+#   5. Parallel Futures and Human Unit Test comparisons (deck slide 8).
+#   6. Source documents - splitting PRDs / bug tickets / meetings, blockers, triage.
+#   7. LangGraph pipelines - the three graphs that chain the agents together.
+# Every agent function has the same shape: llm.structured(Schema, system=..., user=...,
+# mock=...) returns a validated Pydantic object and where it came from ('live' or 'mock').
+
 from __future__ import annotations
 
 import re
@@ -38,6 +51,8 @@ except Exception:  # pragma: no cover
 # ---------------------------------------------------------------------------
 # Local heuristics (also used as the mock fallback)
 # ---------------------------------------------------------------------------
+# Words that say something is NOT needed (NEGATIVE) or IS needed (POSITIVE).
+# Two related statements with opposite polarity are a likely contradiction.
 NEGATIVE = (r"\b(?:no|not|without|never|don'?t|doesn'?t|cannot|can'?t|optional|anonymous|unnecessary"
             r"|disable[sd]?)\b")
 POSITIVE = (r"\b(?:must|required?|requires|mandatory|always|need(?:s|ed)?\s+to|forced?|enforce[sd]?"
@@ -86,6 +101,7 @@ def _subject_overlap(a: str, b: str) -> float:
 
 def heuristic_verdict(a: str, b: str) -> ArchitectVerdict:
     """Rule-based meaning check between two related claims."""
+    # Measure the pair: meaning similarity, shared words, polarity and numbers mentioned.
     sim = similarity(a, b)
     overlap = _subject_overlap(a, b)
     pa, pb = _polarity(a), _polarity(b)
@@ -95,6 +111,7 @@ def heuristic_verdict(a: str, b: str) -> ArchitectVerdict:
     opposed = pa != 0 and pb != 0 and pa != pb
     number_clash = bool(na and nb and na != nb and overlap >= 0.3)
 
+    # Rule 1 - same subject, opposite polarity: a contradiction.
     if opposed and (sim >= 0.22 or overlap >= 0.3):
         earlier, later = (a, b) if pa == -1 else (b, a)
         return ArchitectVerdict(
@@ -111,6 +128,7 @@ def heuristic_verdict(a: str, b: str) -> ArchitectVerdict:
                 "Support both and split the work in two",
             ],
         )
+    # Rule 2 - same subject, different numbers: people assumed different values.
     if number_clash:
         return ArchitectVerdict(
             kind="assumption",
@@ -123,6 +141,7 @@ def heuristic_verdict(a: str, b: str) -> ArchitectVerdict:
             ),
             options=[f"Use {sorted(na)[0]}", f"Use {sorted(nb)[0]}", "Ask the client to confirm"],
         )
+    # Rule 3 - almost the same words or meaning: the same task twice.
     if sim >= 0.50 or overlap >= 0.72:
         return ArchitectVerdict(
             kind="duplicate",
@@ -131,6 +150,7 @@ def heuristic_verdict(a: str, b: str) -> ArchitectVerdict:
             explanation="These two describe the same piece of work in different words. Merge them so nobody builds it twice.",
             options=["Merge into one task", "Keep both — they are different after all"],
         )
+    # Rule 4 - clearly related but undecidable by rules: ask a person.
     if sim >= 0.40:
         return ArchitectVerdict(
             kind="unclear",
@@ -174,6 +194,7 @@ PM_SYSTEM = (
 )
 
 
+# Messages about the meeting itself (not the product) are left out of the brief.
 META = re.compile(r"\b(brief|standup|stand-up|meeting|agenda|channel|slide|deck|welcome)\b", re.I)
 
 
@@ -224,6 +245,7 @@ def _mock_tickets(brief_text: str, messages: list[dict]) -> dict:
             part = part.strip(" -•")
             if len(part) > 18 and not META.search(part):
                 sentences.append(part)
+    # A sentence 'reads like work' if it contains an action verb and isn't a question.
     verbs = ("add", "build", "implement", "create", "set up", "support", "allow", "make",
              "handle", "store", "send", "validate", "design", "write", "update", "need", "require")
     picks: list[str] = []
@@ -237,6 +259,7 @@ def _mock_tickets(brief_text: str, messages: list[dict]) -> dict:
     tickets = []
     for s in picks:
         words = len(s.split())
+        # Rough estimate from how long the description is; the team confirms hours later.
         est = 3.0 if words < 10 else (5.0 if words < 16 else 8.0)
         pri = "High" if re.search(POSITIVE, s.lower()) else "Medium"
         tickets.append({
@@ -249,6 +272,7 @@ def _mock_tickets(brief_text: str, messages: list[dict]) -> dict:
     return {"tickets": tickets}
 
 
+# Filler at the start of chat sentences ('So we should ...') removed to make task titles.
 _LEADER = re.compile(
     r"^(?:so|and|also|but|then|ok|okay|right|well|plus|actually|basically|anyway)\b[,\s]*", re.I)
 _SUBJECT = re.compile(
@@ -336,6 +360,7 @@ def architect_check_batch(pairs: list[tuple[str, str]]) -> list[tuple[ArchitectV
     The model numbers its verdicts; if any pair is missing from the answer, that
     pair falls back to its own single call, so every pair always gets a verdict.
     """
+    # One pair: a single call. Several pairs: one numbered request for all of them.
     if len(pairs) <= 1:
         return [architect_check(a, b) for a, b in pairs]
     listing = "\n\n".join(f"Pair {i}:\nStatement A: {a}\nStatement B: {b}" for i, (a, b) in enumerate(pairs, 1))
@@ -352,6 +377,7 @@ def architect_check_batch(pairs: list[tuple[str, str]]) -> list[tuple[ArchitectV
               "headline, a plain explanation, and 2-3 resolution options."),
         mock=mock,
     )
+    # Match the answers back to the pairs by number; a missing one is asked again on its own.
     by_pair = {v.pair: v for v in batch.verdicts}
     out: list[tuple[ArchitectVerdict, str]] = []
     for i, (a, b) in enumerate(pairs, 1):
@@ -415,6 +441,7 @@ def compare_futures(scenario: str, answers: list[dict]) -> tuple[FuturesComparis
             "hidden_assumptions": hidden[:5],
         }
 
+    # Live mode: the model reads every answer side by side.
     body = "\n\n".join(f"{a['author']} answered: {a['answer']}" for a in answers)
     return llm.structured(
         FuturesComparison,
@@ -461,6 +488,7 @@ def compare_interpretations(ticket_title: str, creator_desc: str, assignee_desc:
 # ---------------------------------------------------------------------------
 # Source documents: PRDs, bug tickets and meeting summaries
 # ---------------------------------------------------------------------------
+# Markdown headings / 'Section:' lines, and bullet or number markers at the start of a line.
 _HEADING = re.compile(r"^\s*(?:#{1,6}\s|[A-Z][A-Za-z ]{0,40}:\s*$)")
 _BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
 
@@ -483,6 +511,7 @@ def split_claims(text: str, limit: int = 25) -> list[str]:
     return claims[:limit]
 
 
+# Phrases that usually mean work is blocked ('waiting on', 'can't deploy', 'depends on').
 _BLOCKER_CUE = re.compile(
     r"\b(?:block(?:ed|s|ing|er)?|waiting (?:on|for)|can(?:'|no)?t (?:start|continue|ship|merge|deploy)"
     r"|depends on|until .{3,40} (?:is|are) (?:done|ready|fixed|approved)|stuck|no access|not available"
@@ -512,6 +541,7 @@ def detect_blockers(kind: str, title: str, text: str) -> tuple[BlockerList, str]
     )
 
 
+# Keyword groups the demo-mode triage uses to pick a category and priority.
 _BUG_WORDS = re.compile(r"\b(?:bug|error|crash|fail(?:s|ed|ing)?|broken|exception|wrong|cannot|can't|doesn'?t work|500|404)\b", re.I)
 _FEATURE_WORDS = re.compile(r"\b(?:feature|add|support|allow|request|would like|should be able|enhance|improve)\b", re.I)
 _QUESTION_WORDS = re.compile(r"\b(?:how (?:do|can|to)|is it possible|question|help|why does)\b", re.I)
@@ -560,6 +590,11 @@ def triage_issue(title: str, body: str) -> tuple[TriageResult, str]:
 # ---------------------------------------------------------------------------
 # LangGraph pipelines
 # ---------------------------------------------------------------------------
+# Each graph has a State (the data passed between steps), node functions (one step
+# each, returning the keys they add), and a compiled StateGraph wiring the steps in order.
+# If LangGraph isn't installed, the run_* functions call the same nodes in the same order.
+
+# Graph 1 - planning: pm_brief -> pm_tickets
 class PlanState(TypedDict, total=False):
     """LangGraph state for the planning graph: chat -> brief -> tickets."""
     messages: list[dict]
@@ -583,6 +618,7 @@ def _node_tickets(state: PlanState) -> PlanState:
     return {"tickets": [t.model_dump() for t in tickets.tickets], "tickets_source": src}
 
 
+# Build the planning graph once, when the module is imported.
 _plan_graph = None
 if HAS_LANGGRAPH:
     _g = StateGraph(PlanState)
@@ -604,6 +640,7 @@ def run_plan_pipeline(messages: list[dict], members: list[str]) -> PlanState:
     return state
 
 
+# Graph 2 - review of a new chat message or task: retrieve -> architect
 class ReviewState(TypedDict, total=False):
     """LangGraph state for the review graph: new claim -> related claims -> verdict."""
     claim: str
@@ -627,6 +664,7 @@ def _node_architect(state: ReviewState) -> ReviewState:
     for (mid, score), (verdict, src) in zip(matches, verdicts, strict=True):
         if verdict.kind == "none":
             continue
+        # Keep only the most serious finding: contradiction > assumption > duplicate > unclear.
         rank = {"contradiction": 3, "assumption": 2, "duplicate": 1, "unclear": 0}[verdict.kind]
         if best is None or rank > best["rank"]:
             best = {"rank": rank, "verdict": verdict.model_dump(), "source": src,
@@ -639,6 +677,7 @@ def _node_architect(state: ReviewState) -> ReviewState:
     return {"verdict": out, "verdict_source": best["source"]}
 
 
+# Build the review graph once, when the module is imported.
 _review_graph = None
 if HAS_LANGGRAPH:
     _r = StateGraph(ReviewState)
@@ -664,6 +703,8 @@ def run_review_pipeline(claim: str, corpus: list[tuple[str, str]]) -> ReviewStat
 MAX_SOURCE_CHECKS = 8     # Architect calls per document, to stay inside free-tier rate limits
 
 
+# Graph 3 - source review (a PRD, bug ticket or meeting summary):
+# split -> retrieve -> architect -> pm_blockers -> pm_triage
 class SourceState(TypedDict, total=False):
     kind: str                         # prd | bug | meeting
     title: str
@@ -737,6 +778,7 @@ def _node_triage(state: SourceState) -> SourceState:
     return {"triage": result.model_dump()}
 
 
+# Build the source-review graph once, when the module is imported.
 _source_graph = None
 if HAS_LANGGRAPH:
     _s = StateGraph(SourceState)

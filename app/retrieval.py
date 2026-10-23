@@ -5,6 +5,15 @@ If either is unavailable (not installed, or the model cannot be downloaded),
 falls back to TF-IDF vectors with numpy cosine similarity. The behaviour of
 `related()` is identical either way, so the rest of the app never branches.
 """
+# How to read this file
+# ---------------------
+# related(query, corpus) is the only function the agents need: it returns the corpus
+# entries that mean the most similar thing to `query`, with a 0..1 score.
+#   embeddings backend: each text becomes a 384-number vector (all-MiniLM-L6-v2) and
+#                       FAISS finds the nearest vectors (cosine similarity).
+#   TF-IDF backend:     word and 4-letter-chunk counts weighted by rarity, compared
+#                       with numpy; used when the model isn't available (e.g. on Render).
+
 from __future__ import annotations
 
 import re
@@ -14,6 +23,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
+# The model is loaded once, on first use, by whichever request needs it first.
 _lock = threading.Lock()
 _model = None
 _backend = "unknown"
@@ -69,6 +79,7 @@ def _faiss_search(corpus_vecs: np.ndarray, query_vecs: np.ndarray, k: int):
 
 # ------------------------------------------------------------------- TF-IDF
 _TOKEN = re.compile(r"[a-z0-9']+")
+# Very common words that carry no meaning for matching.
 _STOP = {
     "the", "a", "an", "and", "or", "but", "if", "we", "i", "you", "they", "it", "is", "are",
     "be", "to", "of", "for", "on", "in", "at", "with", "that", "this", "as", "so", "do",
@@ -90,6 +101,7 @@ def _tokens(text: str) -> list[str]:
     The character grams let the fallback match wording the word index misses
     ("checkout" vs "check out", "guest" vs "guests").
     """
+    # Words without stop words, plus 4-letter chunks of the text with spaces removed.
     words = [_stem(t) for t in _TOKEN.findall(text.lower()) if t not in _STOP and len(t) > 1]
     squashed = "".join(_TOKEN.findall(text.lower()))
     grams = [f"#{squashed[i:i + 4]}" for i in range(max(0, len(squashed) - 3))]
@@ -108,6 +120,8 @@ def _tfidf_matrix(docs: Sequence[str]) -> tuple[np.ndarray, dict[str, int], np.n
     for t in toks:
         for w in set(t):
             df[vocab[w]] += 1
+    # Rare words weigh more (inverse document frequency); each row is then
+    # term frequency x IDF, scaled to length 1 so a dot product is the cosine.
     idf = np.log((1 + n) / (1 + df)) + 1.0
     mat = np.zeros((n, len(vocab)), dtype="float32")
     for i, t in enumerate(toks):
@@ -144,12 +158,14 @@ def related(
     min_score: float = 0.18,
 ) -> list[tuple[str, float]]:
     """Return [(corpus_id, similarity)] most related to `query`, best first."""
+    # Ignore empty texts; nothing to compare means no results.
     corpus = [(cid, text) for cid, text in corpus if (text or "").strip()]
     if not corpus or not (query or "").strip():
         return []
     texts = [t for _, t in corpus]
     ids = [c for c, _ in corpus]
 
+    # Preferred: embeddings + FAISS. Any failure falls through to TF-IDF below.
     if backend() == "embeddings":
         try:
             cvecs = _embed(texts)
@@ -160,6 +176,7 @@ def related(
         except Exception:
             pass  # fall through to TF-IDF
 
+    # Fallback: TF-IDF vectors; the best k above min_score, best first.
     mat, vocab, idf = _tfidf_matrix(texts)
     qv = _tfidf_vector(query, vocab, idf)
     sims = mat @ qv

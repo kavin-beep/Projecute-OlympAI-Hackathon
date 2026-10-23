@@ -15,16 +15,20 @@ from __future__ import annotations
 import os
 import sys
 
+# Make the project folder importable, so `from app import ...` works when run directly.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import db, pipeline  # noqa: E402
 
+# ---------------------------------------------------------------- demo content
+# The team: (username, display name, colour, role). Kavin is the host.
 MEMBERS = [
     ("kavin", "Kavin K", "#6b8afd", "host"),
     ("adrian", "Adrian Rohith", "#4fcf9b", "member"),
     ("sritharan", "Sritharan N S", "#f0a84a", "member"),
 ]
 
+# The chat the PM agent turns into the brief: (author, channel, message).
 CONVERSATION = [
     ("adrian", "checkout",
      "Starting on the checkout flow. Shoppers should be able to buy without creating an account — "
@@ -41,16 +45,19 @@ CONVERSATION = [
      "Good. Let's lock the brief before anyone writes code."),
 ]
 
+# The message that contradicts 'no login for checkout' (sent live in the demo).
 CONFLICT_MESSAGE = (
     "Update from the client: every customer must log in before they can pay, so checkout now "
     "requires an account."
 )
 
+# The host's decision when the demo is run with --full.
 RESOLUTION = (
     "Checkout requires an account. Add a login step before payment and update the checkout tasks; "
     "guest checkout is dropped for this release."
 )
 
+# The Parallel Futures question waiting for the team's answers.
 SCENARIO = (
     "A shopper with items in their cart opens checkout for the first time. "
     "Describe exactly what they see and what they have to do before they can pay."
@@ -62,6 +69,7 @@ def seed(full: bool = False) -> dict:
     db.reset_db()
     ts = db.now()
 
+    # 1. Users, the group, its members and its two channels.
     users: dict[str, str] = {}
     for i, (username, display, accent, _role) in enumerate(MEMBERS):
         uid = db.new_id()
@@ -82,6 +90,7 @@ def seed(full: bool = False) -> dict:
         channels[name] = cid
         db.ex("INSERT INTO channels (id, group_id, name, position) VALUES (?,?,?,?)", (cid, gid, name, pos))
 
+    # 2. The chat history.
     db.ex("INSERT INTO group_messages (id, channel_id, group_id, user_id, kind, content, created_at)"
           " VALUES (?,?,?,?,?,?,?)",
           (db.new_id(), channels["general"], gid, users["kavin"], "user",
@@ -118,6 +127,7 @@ def seed(full: bool = False) -> dict:
         "alerts": 0,
     }
 
+    # --full: also send the conflicting message and resolve the alert it raises.
     if full:
         mid = db.new_id()
         db.ex("INSERT INTO group_messages (id, channel_id, group_id, user_id, kind, content, created_at)"

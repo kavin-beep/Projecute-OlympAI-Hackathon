@@ -1,8 +1,14 @@
 /* Projecute — premium dark by default, light theme on request.
    One accent (mint = agreement/approval). Severity colors are reserved for alerts. */
 
+/* How this file is organised: design tokens (colours, sizes, fonts) in :root; the light */
+/* theme overrides the same tokens; base elements; one section per part of the app (shell, */
+/* panes, thread, group chat, work panel, board, side panel, modal, toasts, login); and the */
+/* narrow-screen rules at the end. */
+
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
+/* Design tokens for the dark theme (the default). Components use only these variables. */
 :root {
   --ink:        #070B16;
   --bg:         #0B1020;
@@ -45,6 +51,7 @@
   --ease: cubic-bezier(.22,.61,.36,1);
 }
 
+/* Light theme: the same tokens with light values (switched by app.js). */
 [data-theme="light"] {
   --ink:        #FFFFFF;
   --bg:         #F6F7FB;
@@ -74,6 +81,7 @@
   --shadow-3: 0 24px 56px -22px rgba(16,23,42,.34);
 }
 
+/* ---------------------------------------------------------------- base elements */
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -596,6 +604,8 @@ textarea.field { height: auto; padding: 9px 11px; resize: vertical; line-height:
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 img.gen { max-width: 100%; border-radius: var(--radius); border: 1px solid var(--line-soft); display: block; }
 
+/* ---------------------------------------------------------------- narrow screens */
+/* Laptops: hide the members column; the work panel and chat take turns. */
 @media (max-width: 1180px) {
   .view.group { grid-template-columns: 72px var(--list) 1fr; }
   .members { display: none; }
@@ -604,12 +614,14 @@ img.gen { max-width: 100%; border-radius: var(--radius); border: 1px solid var(-
   .view.work.panel .thread { display: none; }
   .view.work.panel .workpanel { display: flex; }
 }
+/* Tablets: narrower side lists; less important task columns hidden. */
 @media (max-width: 860px) {
   :root { --list: 210px; --panel: 280px; }
   .thread-inner, .composer-inner, .board-inner { padding-left: 16px; padding-right: 16px; }
   .ticketrow { grid-template-columns: 48px 1fr auto; }
   .ticketrow .pri, .ticketrow .owner { display: none; }
 }
+/* Phones: one column at a time; the menu button switches between list and content. */
 @media (max-width: 640px) {
   .view.chat, .view.board, .view.group, .view.work { grid-template-columns: 1fr; }
   .view .pane-list, .view .serverrail, .view .workpanel { display: none; }
@@ -631,6 +643,7 @@ img.gen { max-width: 100%; border-radius: var(--radius); border: 1px solid var(-
 }
 #btnMenu { display: none; }
 
+/* Respect the system's 'reduce motion' setting. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
