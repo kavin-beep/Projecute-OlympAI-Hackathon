@@ -12,6 +12,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
 
   autoGrow(inputEl);
 
+  // Keep the newest message in view.
   function scrollDown() { scrollEl.scrollTop = scrollEl.scrollHeight; }
 
   // One turn: the user's bubble, or Projecute's answer rendered as Markdown.
@@ -64,6 +65,7 @@ export function createChat({ surface, threadEl, scrollEl, inputEl, sendEl, title
     render();
   }
 
+  // Create a new chat on the server and show it empty, ready to type.
   async function newChat(title) {
     const data = await api('/chats', { method: 'POST', body: { surface, title } });
     chat = data.chat;

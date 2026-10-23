@@ -365,6 +365,7 @@ def architect_check_batch(pairs: list[tuple[str, str]]) -> list[tuple[ArchitectV
         return [architect_check(a, b) for a, b in pairs]
     listing = "\n\n".join(f"Pair {i}:\nStatement A: {a}\nStatement B: {b}" for i, (a, b) in enumerate(pairs, 1))
 
+    # Demo-mode answer for the whole batch: the built-in rules on every pair.
     def mock() -> dict:
         return {"verdicts": [{**heuristic_verdict(a, b).model_dump(), "pair": i}
                              for i, (a, b) in enumerate(pairs, 1)]}

@@ -8,6 +8,7 @@ from app import db
 from tests.conftest import auth, login
 
 
+# A member's edit turns the brief back into a draft; only the host can approve it.
 def test_only_the_host_approves_the_brief(client, demo):
     member = login(client, "adrian")
     host = login(client, "kavin")
@@ -24,6 +25,7 @@ def test_only_the_host_approves_the_brief(client, demo):
     assert brief["status"] == "approved"
 
 
+# The PM agent proposes tasks with a valid priority and hours; only the host approves them.
 def test_tasks_need_an_approved_brief_then_host_approval(client, demo):
     member = login(client, "adrian")
     host = login(client, "kavin")
@@ -46,6 +48,7 @@ def test_tasks_need_an_approved_brief_then_host_approval(client, demo):
     assert all(t["status"] == "approved" for t in tickets)
 
 
+# A member cannot change who owns a task; the host can.
 def test_only_the_host_reassigns_a_task(client, demo):
     member = login(client, "adrian")
     host = login(client, "kavin")
@@ -61,6 +64,7 @@ def test_only_the_host_reassigns_a_task(client, demo):
     assert res.json()["ticket"]["owner_user_id"] == other
 
 
+# A member's edits to title, hours or priority are refused and nothing changes.
 def test_only_the_host_edits_a_task(client, demo):
     member = login(client, "adrian")
     host = login(client, "kavin")
@@ -87,6 +91,7 @@ def test_demo_reset_needs_the_passcode_when_one_is_set(client, demo, monkeypatch
     assert client.post("/api/demo/load", json={"passcode": "olympai"}).status_code == 200
 
 
+# Only the host can switch AI off, and once off, members cannot use that AI mode.
 def test_only_the_host_changes_ai_accessibility(client, demo):
     member = login(client, "adrian")
     host = login(client, "kavin")
@@ -110,6 +115,9 @@ def test_only_the_host_changes_ai_accessibility(client, demo):
                  json={"allow_public_ai": True, "allow_private_ai": True}, headers=auth(host["token"]))
 
 
+# The full slide-7 flow: a conflicting message raises an alert with sources, tasks
+# (each once) and impact; only the host resolves it; the decision is recorded and the
+# QA agent writes acceptance criteria for the affected tasks.
 def test_only_the_host_resolves_an_alert_and_qa_writes_criteria(client, demo):
     member = login(client, "adrian")
     host = login(client, "kavin")
@@ -144,6 +152,7 @@ def test_only_the_host_resolves_an_alert_and_qa_writes_criteria(client, demo):
     assert criteria, "the QA agent drafts acceptance criteria for affected tasks"
 
 
+# The impact total counts only hours the team has confirmed.
 def test_confirmed_hours_drive_the_impact_sum(client, demo):
     host = login(client, "kavin")
     group_id = demo["group_id"]

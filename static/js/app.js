@@ -72,6 +72,7 @@ async function refreshChatList() {
   state.chats = chats;
   renderChatList({
     container: $('#chatList'), chats, activeId: mainChat.chat?.id, query: chatSearch,
+    // What each row's click, rename and delete buttons do.
     onOpen: async (c) => { await mainChat.open(c.id); refreshChatList(); },
     onRename: (c) => {
       const input = el('input', { class: 'field', value: c.title });
@@ -87,6 +88,7 @@ async function refreshChatList() {
         },
       });
     },
+    // Deleting asks for confirmation first.
     onDelete: (c) => {
       modal({
         title: 'Delete this chat?',

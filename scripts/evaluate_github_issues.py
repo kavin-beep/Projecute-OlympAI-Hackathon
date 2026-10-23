@@ -84,6 +84,7 @@ def eval_dedup(pairs: list[tuple[dict, dict, int]], live_limit: int) -> dict:
     best_t = max(sweep, key=lambda t: sweep[t]["f1"])
     fixed_t = 0.5 if retrieval.backend() == "embeddings" else 0.3
 
+    # Score the Architect agent's 'duplicate' verdicts on a list of labelled pairs.
     def architect(subset):
         tp = fp = fn = 0
         for a, b, y in subset:
@@ -155,6 +156,8 @@ def eval_clusters(pair_list: list[dict], fixed: float) -> dict:
         if best:
             nearest[n] = (int(best[0][0]), best[0][1])
 
+    # Link issues whose nearest neighbour scores at least t, then compare the groups
+    # with the maintainers' groups pair by pair.
     def score_at(t: float) -> dict:
         parent: dict[int, int] = {}
         for n, (m, s) in nearest.items():
@@ -237,6 +240,7 @@ def main() -> None:
         random.Random(3).shuffle(data["triage"])
         report["triage_live"] = {"model": llm.model, **eval_triage(data["triage"], args.live)}
 
+    # ---------------------------------------------------------------- report
     d = report["dedup"]
     print("De-duplication (real duplicates vs same-component hard negatives)")
     print(f"  {d['pairs']} pairs, {d['positives']} real duplicates")
@@ -248,6 +252,7 @@ def main() -> None:
         r = d[key]
         if r:
             print(f"  {name:<26} {r.get('pairs', d['pairs'])} pairs  P {r['precision']:.3f}  R {r['recall']:.3f}  F1 {r['f1']:.3f}")
+    # Search, clustering and triage results.
     s = report["search"]
     print(f"\nSearch: each duplicate vs all {s['candidates']} originals")
     print(f"  recall@1 {s['recall_at_1']:.3f}   recall@5 {s['recall_at_5']:.3f}")

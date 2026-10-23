@@ -104,12 +104,14 @@ def main() -> int:
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
     accuracy = (tp + tn) / len(evaluated)
 
+    # ---------------------------------------------------------------- report
     print("Duplicate detection")
     print(f"  Source file:    {args.csv_path}")
     print(f"  Rows usable:    {len(pairs)}   evaluated: {len(evaluated)}")
     print(f"  Judged by:      {'Groq (' + llm.model + ')' if llm.mode == 'live' else 'built-in rules (no AI provider key)'}")
     print(f"  Claim search:   {retrieval.backend_label()}")
     print()
+    # The four counts, then the scores computed from them.
     print(f"  True positives  {tp}")
     print(f"  False positives {fp}")
     print(f"  False negatives {fn}")

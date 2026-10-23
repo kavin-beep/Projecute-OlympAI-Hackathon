@@ -11,6 +11,7 @@ from __future__ import annotations
 from tests.conftest import auth, login
 
 
+# Another user can neither open nor list someone else's private chat.
 def test_individual_chat_is_private(client, demo):
     a = login(client, "adrian")
     b = login(client, "sritharan")
@@ -25,6 +26,7 @@ def test_individual_chat_is_private(client, demo):
     assert all(c["id"] != chat["id"] for c in listed)
 
 
+# Another user cannot rename or delete it either (404, as if it didn't exist).
 def test_other_user_cannot_rename_or_delete_a_chat(client, demo):
     a = login(client, "adrian")
     b = login(client, "sritharan")
@@ -35,6 +37,8 @@ def test_other_user_cannot_rename_or_delete_a_chat(client, demo):
     assert client.get(f"/api/chats/{chat['id']}", headers=auth(a["token"])).json()["chat"]["title"] == "mine"
 
 
+# An item is invisible to others until shared, then visible under Team outputs,
+# and private again after unsharing.
 def test_workspace_item_is_private_until_shared(client, demo):
     a = login(client, "adrian")
     b = login(client, "sritharan")
@@ -61,6 +65,7 @@ def test_workspace_item_is_private_until_shared(client, demo):
     assert client.get(f"/api/items/{item['id']}", headers=auth(b["token"])).status_code == 404
 
 
+# Sharing into a group you don't belong to is refused.
 def test_item_cannot_be_shared_into_a_group_you_are_not_in(client, demo):
     a = login(client, "adrian")
     item = client.post("/api/items/generate", headers=auth(a["token"]), json={
@@ -70,6 +75,7 @@ def test_item_cannot_be_shared_into_a_group_you_are_not_in(client, demo):
     assert res.status_code == 403
 
 
+# Private help: the asker gets the answer; the group sees only 'X used AI'.
 def test_private_ai_help_stays_with_the_asker(client, demo):
     a = login(client, "adrian")
     b = login(client, "sritharan")
@@ -98,6 +104,7 @@ def test_private_ai_help_stays_with_the_asker(client, demo):
                for h in client.get(f"/api/groups/{group_id}/private-help", headers=auth(b["token"])).json()["help"])
 
 
+# A group you are not in cannot be opened.
 def test_non_members_cannot_read_a_group(client, demo):
     a = login(client, "adrian")
     headers = auth(a["token"])
@@ -141,6 +148,7 @@ def test_other_groups_messages_stay_out_of_reach(client, demo):
     assert res.status_code == 404
 
 
+# A reaction to a message that doesn't exist is a clean 404, not a crash.
 def test_reacting_to_a_missing_message_is_a_404(client, demo):
     a = login(client, "adrian")
     res = client.post(f"/api/groups/{demo['group_id']}/messages/not-a-message/reactions",
@@ -148,6 +156,7 @@ def test_reacting_to_a_missing_message_is_a_404(client, demo):
     assert res.status_code == 404
 
 
+# No token, or a made-up token, gets 401 on every private endpoint.
 def test_requests_without_a_session_are_rejected(client, demo):
     assert client.get("/api/chats").status_code == 401
     assert client.get("/api/items").status_code == 401

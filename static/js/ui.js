@@ -81,6 +81,7 @@ export function modal({ title, body, confirmLabel = 'Save', onConfirm, cancelLab
   const scrim = $('#scrim'), box = $('#modal');
   clear(box);
   const foot = el('div', { class: 'mf' });
+  // Buttons: Cancel always; the confirm button only when there is something to confirm.
   const close = () => { scrim.classList.remove('open'); };
   foot.append(el('button', { class: 'btn ghost', onclick: close }, cancelLabel));
   if (onConfirm) {
@@ -135,11 +136,13 @@ export function markdown(src) {
   const wrap = el('div', { class: 'md' });
   const lines = String(src || '').split('\n');
   let i = 0, html = '';
+  // Text is collected as (escaped) HTML and added in one go before each code block.
   const flushTo = () => { if (html) { wrap.insertAdjacentHTML('beforeend', html); html = ''; } };
 
   // Read line by line: code fences, headings, lists, quotes, tables, then paragraphs.
   while (i < lines.length) {
     const line = lines[i];
+    // ```code fences``` become a code block with a Copy button.
     const fence = line.match(/^```(\w*)/);
     if (fence) {
       const lang = fence[1];
@@ -151,8 +154,10 @@ export function markdown(src) {
       wrap.append(codeBlock(buf.join('\n'), lang));
       continue;
     }
+    // # Headings (one level smaller than in the source, so they fit in a chat bubble).
     const head = line.match(/^(#{1,4})\s+(.*)$/);
     if (head) { html += `<h${head[1].length + 1}>${inline(head[2])}</h${head[1].length + 1}>`; i++; continue; }
+    // Bulleted lists, numbered lists and > quotes: gather consecutive lines into one block.
     if (/^\s*[-*]\s+/.test(line)) {
       const items = [];
       while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) items.push(inline(lines[i++].replace(/^\s*[-*]\s+/, '')));
@@ -173,6 +178,7 @@ export function markdown(src) {
     }
     // Tables: a | row | followed by a | --- | separator row (AI answers often use them).
     if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(lines[i + 1] || '')) {
+      // Split a | a | b | row into its cells.
       const cells = (row) => row.trim().replace(/^\||\|$/g, '').split('|').map((c) => inline(c.trim()));
       const head = cells(line);
       i += 2;
@@ -182,6 +188,7 @@ export function markdown(src) {
         + `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
       continue;
     }
+    // Anything else: a paragraph of consecutive plain lines.
     if (!line.trim()) { i++; continue; }
     const buf = [];
     while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|\s*[-*]\s|\s*\d+\.\s|>|\s*\|)/.test(lines[i])) buf.push(inline(lines[i++]));
@@ -268,6 +275,7 @@ export function emptyState({ art = 'sparkle', title, text, actionLabel, onAction
 
 // Grow a textarea with its content, up to a limit.
 export function autoGrow(textarea) {
+  // Measure the content and set the height, up to 180 px.
   const fit = () => { textarea.style.height = 'auto'; textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`; };
   textarea.addEventListener('input', fit);
   fit();

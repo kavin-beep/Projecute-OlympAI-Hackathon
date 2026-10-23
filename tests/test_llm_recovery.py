@@ -22,10 +22,12 @@ class BadRequestError(Exception):
 class FlakyClient:
     """Fails the first call, then answers normally."""
 
+    # Mimic the SDK's client.chat.completions.create(...) shape.
     def __init__(self) -> None:
         self.calls = 0
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
 
+    # The first call fails; later calls return a normal answer.
     def create(self, **_kwargs):
         self.calls += 1
         if self.calls == 1:
@@ -36,13 +38,17 @@ class FlakyClient:
 class DownClient:
     """Always fails, like a provider outage."""
 
+    # Mimic the SDK's client.chat.completions.create(...) shape.
     def __init__(self) -> None:
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
 
+    # Every call fails.
     def create(self, **_kwargs):
         raise BadRequestError("provider down")
 
 
+# An outage raises AIUnavailable (the user is asked to retry), the header stays
+# 'Live AI', and the next call answers live again.
 def test_a_provider_error_never_switches_the_app_to_demo_mode():
     llm = LLM()
     llm._client = FlakyClient()
@@ -57,6 +63,7 @@ def test_a_provider_error_never_switches_the_app_to_demo_mode():
     assert llm.status()["reason"] is None
 
 
+# A streamed chat that keeps failing ends with the 'try again' message, not a demo answer.
 def test_streamed_chat_asks_to_try_again_instead_of_a_demo_answer(monkeypatch):
     monkeypatch.setattr(llm_module.time, "sleep", lambda _s: None)   # skip the backoff waits
     llm = LLM()
@@ -67,6 +74,7 @@ def test_streamed_chat_asks_to_try_again_instead_of_a_demo_answer(monkeypatch):
     assert llm.mode == "live"
 
 
+# A failing agent step falls back to the built-in rules for that step only.
 def test_agent_steps_use_the_rules_for_that_step_and_stay_live(monkeypatch):
     from app.schemas import AcceptanceCriteria
 
@@ -86,10 +94,12 @@ class RateLimitError(Exception):
 class MainModelLimitedClient:
     """The main model is out of daily tokens; the backup model answers."""
 
+    # Remember which model each call asked for.
     def __init__(self) -> None:
         self.models: list[str] = []
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
 
+    # The main model is rate-limited; any other model answers.
     def create(self, **kwargs):
         self.models.append(kwargs["model"])
         if kwargs["model"] == "openai/gpt-oss-120b":
@@ -97,6 +107,8 @@ class MainModelLimitedClient:
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="backup answer"))])
 
 
+# A daily limit on gpt-oss-120b moves the call to gpt-oss-20b with no waiting,
+# and later calls skip the limited model until its limit resets.
 def test_a_rate_limited_main_model_switches_to_the_backup_at_once(monkeypatch):
     slept: list[float] = []
     monkeypatch.setattr(llm_module.time, "sleep", slept.append)

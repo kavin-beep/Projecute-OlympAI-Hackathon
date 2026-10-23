@@ -212,6 +212,7 @@ class LLM:
                 model = self._models()[0]
                 sent = False
                 try:
+                    # Pass each piece of the answer on as soon as it arrives.
                     for chunk in self._request(model, messages, temperature, max_tokens, stream=True):
                         piece = chunk.choices[0].delta.content or ""
                         if piece:
@@ -219,6 +220,7 @@ class LLM:
                             yield piece
                     self._degraded_reason = None
                     return
+                # The stream failed: finish politely if text was already shown, otherwise retry.
                 except Exception as exc:
                     self._note_problem(f"{type(exc).__name__} during streaming")
                     if sent:                      # part of the answer is already on screen
@@ -234,6 +236,7 @@ class LLM:
                     else:
                         time.sleep(delay + random.random() * 0.3)
                         delay *= 2
+            # Every retry failed before any text was sent: ask the user to try again.
             yield BUSY_MESSAGE
             return
         # No key: send the demo answer word by word so it looks like streaming.

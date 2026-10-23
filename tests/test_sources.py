@@ -34,6 +34,7 @@ def _add(client, token, group_id, kind, title, content):
     return res.json()
 
 
+# A PRD line that contradicts the chat raises an alert quoting both, with dependent tasks.
 def test_a_prd_that_contradicts_the_chat_is_flagged_with_both_sides(client, demo):
     adrian = login(client, "adrian")
     out = _add(client, adrian["token"], demo["group_id"], "prd", "Checkout PRD v2", PRD)
@@ -46,6 +47,7 @@ def test_a_prd_that_contradicts_the_chat_is_flagged_with_both_sides(client, demo
     assert conflicts[0]["tickets"]                       # dependent tasks are listed
 
 
+# A 'blocked until ...' line in a meeting summary becomes one high-severity blocker alert.
 def test_a_meeting_summary_blocker_is_flagged(client, demo):
     sritharan = login(client, "sritharan")
     out = _add(client, sritharan["token"], demo["group_id"], "meeting", "Sprint sync", MEETING)
@@ -55,6 +57,8 @@ def test_a_meeting_summary_blocker_is_flagged(client, demo):
     assert blockers[0]["severity"] == "high"
 
 
+# A bug ticket becomes a proposed Fix task; a reworded repeat is flagged once as a
+# duplicate and adds no second task.
 def test_a_bug_is_triaged_into_a_task_and_a_repeat_report_is_a_duplicate(client, demo):
     adrian = login(client, "adrian")
     gid = demo["group_id"]
@@ -71,6 +75,7 @@ def test_a_bug_is_triaged_into_a_task_and_a_repeat_report_is_a_duplicate(client,
     assert not any(t["title"] == "Fix: Summary total missing shipping" for t in tasks)
 
 
+# Bad document input is refused, and non-members can neither add nor list sources.
 def test_sources_are_members_only_and_validated(client, demo):
     adrian = login(client, "adrian")
     gid = demo["group_id"]
@@ -81,6 +86,7 @@ def test_sources_are_members_only_and_validated(client, demo):
     assert client.get("/api/groups/not-mine/documents", headers=auth(adrian["token"])).status_code == 403
 
 
+# Any member can submit a task (it waits for the host); a near-copy is flagged as a duplicate.
 def test_a_member_submits_a_task_and_a_duplicate_submission_is_flagged(client, demo):
     adrian = login(client, "adrian")
     gid = demo["group_id"]
@@ -95,6 +101,7 @@ def test_a_member_submits_a_task_and_a_duplicate_submission_is_flagged(client, d
                for a in alerts)
 
 
+# Only the host can dismiss a false alert; no decision is recorded and it stays closed.
 def test_only_the_host_dismisses_a_false_alert_and_no_decision_is_recorded(client, demo):
     host, member = login(client, "kavin"), login(client, "adrian")
     gid = demo["group_id"]
@@ -112,6 +119,7 @@ def test_only_the_host_dismisses_a_false_alert_and_no_decision_is_recorded(clien
                        json={"resolution": "x"}).status_code == 400   # closed alerts stay closed
 
 
+# Decision impact: a resolved alert's decision lists exactly the alert's tasks.
 def test_a_decision_lists_the_tasks_it_changes(client, demo):
     host = login(client, "kavin")
     gid = demo["group_id"]
@@ -123,6 +131,7 @@ def test_a_decision_lists_the_tasks_it_changes(client, demo):
     assert {t["id"] for t in decision["tickets"]} == {t["id"] for t in alert["tickets"]}
 
 
+# The event log downloads as a JSON file with every agent action, for members only.
 def test_the_event_log_downloads_for_members_only(client, demo):
     member = login(client, "sritharan")
     gid = demo["group_id"]

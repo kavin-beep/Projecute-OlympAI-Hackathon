@@ -143,6 +143,7 @@ export async function openItem(itemId) {
     });
     card.append(play, el('div', { class: 'meta', style: 'margin-top:10px' }, item.body));
   } else if (item.kind === 'code') {
+    // Code: an editable text box. It is stored as text and never run.
     const editor = el('textarea', { class: 'field mono', style: 'min-height:240px' });
     editor.value = item.body;
     card.append(editor);
@@ -155,6 +156,7 @@ export async function openItem(itemId) {
     });
     card.append(save);
   } else {
+    // Content and emails: shown as formatted text, with an Edit button.
     card.append(markdown(item.body));
     const edit = el('button', { class: 'btn sm', style: 'margin-top:10px' }, icon('pencil', 13), 'Edit text');
     edit.addEventListener('click', () => {
@@ -174,6 +176,7 @@ export async function openItem(itemId) {
   area.append(card);
 
   // actions
+  // Buttons: back to the source chat, share or unshare, delete.
   const actions = el('div', { class: 'stack' });
   if (item.source_chat_id) {
     const link = el('button', { class: 'btn wide' }, icon('chat', 14), 'Open the chat this came from');
@@ -185,6 +188,7 @@ export async function openItem(itemId) {
     });
     actions.append(link);
   }
+  // Sharing is explicit, and can be undone with 'Make private again'.
   if (!item.shared_group_id) {
     const share = el('button', { class: 'btn wide' }, icon('share', 14), 'Share to a group workspace');
     share.addEventListener('click', () => shareDialog(item));
@@ -199,6 +203,7 @@ export async function openItem(itemId) {
     });
     actions.append(unshare);
   }
+  // Deleting asks for confirmation first.
   const del = el('button', { class: 'btn wide danger' }, icon('trash', 14), 'Delete item');
   del.addEventListener('click', () => {
     modal({
@@ -263,6 +268,7 @@ export function newItemDialog(prefill = {}) {
       el('div', { class: 'row' }, el('label', {}, 'What should it say?'), prompt),
       fromChat),
     confirmLabel: 'Generate item',
+    // Check the inputs, ask the server to generate the item, then open it.
     onConfirm: async () => {
       if (!name.value.trim()) { toast('Name the item so you can find it later.', 'err'); return false; }
       if (!prompt.value.trim()) { toast('Say what you want generated.', 'err'); return false; }

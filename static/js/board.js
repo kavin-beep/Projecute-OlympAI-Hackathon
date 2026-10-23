@@ -89,6 +89,7 @@ function renderSources(body) {
     }));
     return;
   }
+  // One card per source document, with how many flags it raised.
   for (const d of w.documents) {
     const card = el('div', { class: 'card itemcard' });
     card.append(el('div', { class: 'cardhead' },
@@ -107,6 +108,7 @@ function renderSources(body) {
 function addSourceDialog() {
   const kind = el('select', { class: 'field' });
   for (const [value, label] of SOURCE_KINDS) kind.append(el('option', { value }, label));
+  // A hint under the type picker explains what each kind of document is for.
   const hint = el('div', { class: 'meta', style: 'margin-top:4px' }, SOURCE_KINDS[0][2]);
   kind.addEventListener('change', () => { hint.textContent = SOURCE_KINDS.find((k) => k[0] === kind.value)[2]; });
   const title = el('input', { class: 'field', placeholder: 'e.g. Checkout PRD v2' });
@@ -124,6 +126,7 @@ function addSourceDialog() {
         toast('Add a title and at least a sentence of text.', 'err');
         return false;
       }
+      // The server runs the source-review graph and answers with the alerts it raised.
       toast('The agents are checking it…');
       try {
         const { alerts } = await api(`/groups/${state.group.group.id}/documents`, {
@@ -267,11 +270,14 @@ function futuresBlock() {
     const mine = f.answers.find((a) => a.user_id === state.me.id);
     box.append(el('div', { class: 'meta' }, `${f.answers.length} of ${state.group.members.length} answered`));
 
+    // Not answered yet: answer first. Compared: show the result. Otherwise: list the
+    // answers and offer 'Compare answers' once at least two people have answered.
     if (!mine) {
       const ans = el('button', { class: 'btn sm primary', style: 'margin-top:10px' }, 'Write my answer');
       ans.addEventListener('click', () => answerFutureDialog(f));
       box.append(ans);
     } else if (f.comparison) {
+      // Compared: the summary, the hidden assumptions, and what everyone agreed on.
       const c = f.comparison;
       box.append(el('div', { class: 'card flat', style: 'margin-top:10px;padding:0' },
         el('p', { style: 'margin-top:10px' }, c.summary),
@@ -286,6 +292,7 @@ function futuresBlock() {
       box.append(answersList(f));
     } else {
       box.append(answersList(f));
+      // Comparing needs at least two answers.
       const cmp = el('button', { class: 'btn sm', style: 'margin-top:10px' }, icon('sparkle', 13), 'Compare answers');
       cmp.disabled = f.answers.length < 2;
       cmp.addEventListener('click', async () => {
@@ -385,6 +392,7 @@ function newTaskDialog() {
   const pri = el('select', { class: 'field' });
   for (const p of ['Low', 'Medium', 'High']) pri.append(el('option', { value: p }, p));
   pri.value = 'Medium';
+  // Hours and owner are suggestions; the host can change them when approving.
   const hours = el('input', { class: 'field', type: 'number', min: '0.5', step: '0.5', value: '4' });
   const owner = el('select', { class: 'field' });
   owner.append(el('option', { value: '' }, 'Let the host assign it'));
@@ -697,6 +705,8 @@ function renderDecisions(body) {
     }));
     return;
   }
+  // One card per decision: what was decided, the tasks it changes, who approved it,
+  // and a link back to the alert and messages behind it.
   for (const d of w.decisions) {
     const card = el('div', { class: 'card' });
     card.append(el('div', { class: 'cardhead' }, icon('check', 15), el('h4', {}, d.title),
@@ -716,6 +726,7 @@ function renderDecisions(body) {
       card.append(el('div', { class: 'impact' }, el('span', { class: 'meta' }, 'Tasks this decision changes'), chips));
     }
     const foot = el('div', { class: 'row-between' }, el('span', { class: 'meta' }, `Approved by ${d.decided_by_name}`));
+    // Link back to the alert (and its quoted messages) this decision came from.
     if (d.alert_id) {
       const link = el('button', { class: 'btn sm ghost' }, 'See the messages behind it');
       link.addEventListener('click', async () => {
@@ -739,12 +750,14 @@ function renderActivity(body) {
     body.append(emptyState({ art: 'clock', title: 'Nothing has happened yet', text: 'Agent and host actions are logged here as they happen.' }));
     return;
   }
+  // A timeline of every action; alerts and tasks mentioned in it can be opened directly.
   const line = el('div', { class: 'timeline' });
   for (const a of w.activity) {
     const row = el('div', { class: `tl${a.actor_kind === 'agent' ? ' agent' : ''}` });
     row.append(el('div', { class: 'when' }, `${relative(a.created_at)} · ${timeOf(a.created_at)}`));
     row.append(el('div', { class: 'what' }, el('span', { class: 'actor' }, a.actor), ' ', a.action.toLowerCase()));
     if (a.detail) row.append(el('div', { class: 'meta' }, a.detail));
+    // Entries about an alert or a task get a button that opens it.
     if (a.ref_kind === 'alert' && a.ref_id) {
       const link = el('button', { class: 'btn sm ghost' }, 'Open alert');
       link.addEventListener('click', async () => {

@@ -102,7 +102,7 @@ deck, with where to see it.
 | README: how to run the main code | [Running the main code](#-running-the-main-code) |
 | README: dependencies | [Dependencies](#-dependencies), `requirements.txt` |
 | README: AI tools used | [AI tools used](#-ai-tools-used) |
-| Well-commented code | Every module, class and function has a docstring or comment |
+| Well-commented code | Every module, class and function has a docstring or comment; each main file opens with a *How to read this file* guide, longer functions have step-by-step comments, and the frontend, run scripts and config files are commented too |
 | Code standards | `ruff` (pycodestyle, pyflakes, bugbear, pyupgrade, simplify, isort rules) passes with no findings |
 | Original work, credited | No code copied from other projects; AI tools, libraries, models, fonts, services and the GitHub data are all credited with their licences in [Credits and licences](#-credits-and-licences) |
 
@@ -526,7 +526,7 @@ source** and paste any of these:
 | `app/__init__.py` | Marks `app` as a Python package |
 | `app/main.py` | FastAPI application: every HTTP endpoint for the four areas, sign-in, permission checks (member, host, same group), server-sent events for streamed chat, the WebSocket endpoint and the static frontend |
 | `app/pipeline.py` | The group pipeline as plain functions over the database: brief → tickets → conflict review → decision → QA. Returns the live events to broadcast |
-| `app/agents.py` | The PM, Architect and QA agents, Parallel Futures and Human Unit Test comparisons, the two LangGraph graphs (planning and review), and the rule-based demo-mode logic |
+| `app/agents.py` | The PM, Architect and QA agents, Parallel Futures and Human Unit Test comparisons, the three LangGraph graphs (planning, chat review and source review), source splitting, blocker detection, bug triage, and the rule-based demo-mode logic |
 | `app/llm.py` | Groq adapter: JSON validation with retries, answer cache, exponential backoff, streaming, and labelled demo mode. Never logs or returns the key |
 | `app/retrieval.py` | Related-claim search with Sentence Transformers + FAISS, and the TF-IDF fallback |
 | `app/schemas.py` | Pydantic schemas that every AI JSON answer is validated against |
@@ -543,7 +543,7 @@ source** and paste any of these:
 | `static/js/chat.js` | Individual chat |
 | `static/js/group.js` | Group chat: channels, messages, reactions, replies, AI modes, host controls |
 | `static/js/workspace.js` | Individual workspace: projects, named items, sharing |
-| `static/js/board.js` | Group workspace: Brief, Tasks, Decisions, Alerts, Activity, Team outputs, Parallel Futures, Human Unit Test |
+| `static/js/board.js` | Group workspace: Brief, Sources, Tasks, Decisions, Alerts, Activity, Team outputs, Parallel Futures, Human Unit Test |
 | **scripts/** | **Command-line tools** |
 | `scripts/seed_demo.py` | Resets the database and stages the demo team, chat, approved brief and tasks |
 | `scripts/evaluate_conflicts.py` | Scores the 18 planted conflict scenarios |
@@ -616,7 +616,7 @@ in the interface:
   plan.
 - **Groups are isolated.** Channels, messages and scenarios must belong to the
   group named in each request.
-- **Public or synthetic demo text only**, and API keys live in `.env` or Space
+- **Public or synthetic demo text only**, and API keys live in `.env` or Render
   secrets, never in the code.
 - **Code is never executed**: generated code is stored and edited as text only.
 
@@ -658,6 +658,8 @@ directed the AI tools.
   both chat messages; approving it recorded a decision listing T-1 to T-4; the
   event log downloaded as JSON; no console errors.
 - `ruff` lint passes with no findings.
+- The code comments changed no code: every Python file parses to the same
+  program as before, and every other change is a comment line only.
 - The full demo flow: brief → host approval → tasks → new login requirement →
   alert with sources, affected tasks and hours → host resolution → QA criteria.
 - Sentence Transformers + FAISS retrieval and both evaluations (results above).

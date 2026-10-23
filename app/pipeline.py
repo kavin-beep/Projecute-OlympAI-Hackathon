@@ -212,6 +212,8 @@ def workspace_state(group_id: str) -> dict:
             "SELECT COUNT(DISTINCT e.alert_id) AS n FROM alert_evidence e"
             " JOIN document_claims c ON e.ref_kind='claim' AND c.id=e.ref_id WHERE c.document_id=?",
             (doc["id"],))["n"]
+    # The latest activity entries, items shared into the group (Team outputs),
+    # Parallel Futures with their answers, and Human Unit Tests.
     activity = db.rows_to_dicts(db.q(
         "SELECT * FROM activity WHERE group_id=? ORDER BY created_at DESC LIMIT 80", (group_id,)))
     outputs = db.rows_to_dicts(db.q(
@@ -231,6 +233,7 @@ def workspace_state(group_id: str) -> dict:
         u["creator_name"] = user_name(u["creator_user_id"])
         u["assignee_name"] = user_name(u.get("assignee_user_id"))
     return {
+        # Everything the workspace shows, plus the count badges for the section list.
         "brief": dict(brief) if brief else None,
         "tickets": tickets,
         "alerts": alerts,

@@ -36,6 +36,7 @@ DISTRACTORS = [
 
 # id, planted earlier claim, new claim, expected kind
 SCENARIOS: list[tuple[str, str, str, str]] = [
+    # Each scenario: (name, earlier claim planted in the corpus, the new claim, the expected verdict).
     ("login-vs-guest",
      "Agreed, no login for checkout. We just collect an email address so we can send the receipt.",
      "Update from the client: every customer must log in before they can pay, so checkout requires an account.",

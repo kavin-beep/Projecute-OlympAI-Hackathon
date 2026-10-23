@@ -21,6 +21,7 @@ def drain(ws, event_name, limit=25):
     return None
 
 
+# A message one member sends appears live in the other member's open window.
 def test_a_group_message_reaches_the_other_member(client, demo):
     a = login(client, "adrian")
     b = login(client, "sritharan")
@@ -35,6 +36,7 @@ def test_a_group_message_reaches_the_other_member(client, demo):
         assert payload and payload["data"]["content"] == "Pushing the address form today."
 
 
+# Over the live feed, others receive only the 'used AI' notice, never the content.
 def test_private_help_sends_only_a_usage_notice_to_others(client, demo):
     a = login(client, "adrian")
     b = login(client, "sritharan")
@@ -53,6 +55,7 @@ def test_private_help_sends_only_a_usage_notice_to_others(client, demo):
         assert "webhook" not in json.dumps(payload).lower()
 
 
+# When the host resolves an alert, the member's dashboard updates without reloading.
 def test_host_approval_updates_the_other_dashboard(client, demo):
     host = login(client, "kavin")
     member = login(client, "sritharan")
@@ -80,6 +83,7 @@ def test_host_approval_updates_the_other_dashboard(client, demo):
     assert any(d["content"].startswith("Accounts are required") for d in ws_state["decisions"])
 
 
+# Activity shows the PM, Architect and QA agents' actions.
 def test_activity_timeline_records_each_agent(client, demo):
     host = login(client, "kavin")
     activity = client.get(f"/api/groups/{demo['group_id']}/workspace", headers=auth(host["token"])).json()["activity"]
@@ -89,6 +93,7 @@ def test_activity_timeline_records_each_agent(client, demo):
     assert "QA agent" in actors
 
 
+# A WebSocket with an invalid session token is refused.
 def test_a_bad_token_cannot_open_a_socket(client, demo):
     import pytest
     from starlette.websockets import WebSocketDisconnect
