@@ -148,3 +148,24 @@ def test_confirmed_hours_drive_the_impact_sum(client, demo):
     alert = ws["alerts"][0]
     expected = sum(t["estimated_hours"] for t in alert["tickets"] if t["hours_confirmed"])
     assert abs(alert["confirmed_hours"] - round(expected, 1)) < 0.05
+
+
+def test_task_edits_and_long_inputs_are_validated(client, demo):
+    """Bad task edits and oversized text get a clear 400, never a crash or bad data."""
+    host = login(client, "kavin")
+    gid = demo["group_id"]
+    ticket = client.get(f"/api/groups/{gid}/workspace", headers=auth(host["token"])).json()["tickets"][0]
+    outsider = db.new_id()
+    db.ex("INSERT INTO users (id, username, display_name, created_at) VALUES (?,?,?,?)",
+          (outsider, f"outsider-{outsider}", "Outsider", db.now()))
+    for bad in ({"estimated_hours": "abc"}, {"estimated_hours": -5}, {"estimated_hours": 1e9},
+                {"priority": "Whenever"}, {"status": "exploded"}, {"owner_user_id": outsider}, {"title": "   "}):
+        res = client.patch(f"/api/groups/{gid}/tickets/{ticket['id']}", json=bad, headers=auth(host["token"]))
+        assert res.status_code == 400, (bad, res.text)
+    after = client.get(f"/api/groups/{gid}/workspace", headers=auth(host["token"])).json()["tickets"][0]
+    assert (after["title"], after["estimated_hours"], after["priority"]) == \
+        (ticket["title"], ticket["estimated_hours"], ticket["priority"])
+
+    chat = client.post("/api/chats", json={}, headers=auth(host["token"])).json()["chat"]["id"]
+    res = client.post(f"/api/chats/{chat}/messages", json={"content": "x" * 5000}, headers=auth(host["token"]))
+    assert res.status_code == 400 and "at most" in res.json()["detail"]

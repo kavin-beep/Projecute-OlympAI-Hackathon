@@ -163,9 +163,20 @@ export function markdown(src) {
       html += `<blockquote>${buf.join('<br>')}</blockquote>`;
       continue;
     }
+    // Tables: a | row | followed by a | --- | separator row (AI answers often use them).
+    if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(lines[i + 1] || '')) {
+      const cells = (row) => row.trim().replace(/^\||\|$/g, '').split('|').map((c) => inline(c.trim()));
+      const head = cells(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(cells(lines[i++]));
+      html += `<div class="tablewrap"><table><thead><tr>${head.map((c) => `<th>${c}</th>`).join('')}</tr></thead>`
+        + `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      continue;
+    }
     if (!line.trim()) { i++; continue; }
     const buf = [];
-    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|\s*[-*]\s|\s*\d+\.\s|>)/.test(lines[i])) buf.push(inline(lines[i++]));
+    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|\s*[-*]\s|\s*\d+\.\s|>|\s*\|)/.test(lines[i])) buf.push(inline(lines[i++]));
     html += `<p>${buf.join('<br>')}</p>`;
   }
   flushTo();

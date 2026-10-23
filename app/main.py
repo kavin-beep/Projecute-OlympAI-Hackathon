@@ -126,6 +126,44 @@ def require_host(group_id: str, user: dict) -> None:
         raise HTTPException(403, "Only the host can approve this.")
 
 
+# Input limits keep requests within the AI's token budget and the database sensible.
+MAX_MESSAGE = 4000      # chat messages and generation prompts
+MAX_SHORT = 2000        # scenarios, answers, descriptions, resolutions
+MAX_BRIEF = 20000       # the project brief
+
+
+def _check_length(text: str, limit: int, what: str) -> None:
+    """Reject over-long text with a clear message instead of sending it to the AI."""
+    if len(text) > limit:
+        raise HTTPException(400, f"{what} can be at most {limit:,} characters.")
+
+
+def _validate_ticket_patch(group_id: str, patch: dict) -> None:
+    """Check a host's task edit before it is saved (400 with a plain message if invalid)."""
+    if "title" in patch and patch["title"] is not None:
+        title = str(patch["title"]).strip()
+        if not title:
+            raise HTTPException(400, "The task needs a title.")
+        _check_length(title, 140, "Task titles")
+        patch["title"] = title
+    if patch.get("detail") is not None:
+        _check_length(str(patch["detail"]), MAX_SHORT, "Task details")
+    if patch.get("priority") is not None and patch["priority"] not in ("Low", "Medium", "High"):
+        raise HTTPException(400, "Priority must be Low, Medium or High.")
+    if patch.get("status") is not None and patch["status"] not in ("proposed", "approved", "blocked", "done"):
+        raise HTTPException(400, "Status must be proposed, approved, blocked or done.")
+    if patch.get("owner_user_id") and not db.is_member(group_id, patch["owner_user_id"]):
+        raise HTTPException(400, "The owner must be a member of this group.")
+    if patch.get("estimated_hours") is not None:
+        try:
+            hours = float(patch["estimated_hours"])
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(400, "Estimated hours must be a number.") from exc
+        if not 0.5 <= hours <= 200:
+            raise HTTPException(400, "Estimated hours must be between 0.5 and 200.")
+        patch["estimated_hours"] = hours
+
+
 def require_channel(group_id: str, channel_id: str) -> None:
     """Reject with 404 unless the channel belongs to this group."""
     if not db.q1("SELECT 1 FROM channels WHERE id=? AND group_id=?", (channel_id, group_id)):
@@ -257,6 +295,7 @@ async def send_chat_message(chat_id: str, payload: dict = Body(...), user: dict 
     """Save the user's message and stream the AI reply back as server-sent events."""
     chat = _own_chat(chat_id, user)
     content = (payload.get("content") or "").strip()
+    _check_length(content, MAX_MESSAGE, "Messages")
     if not content:
         raise HTTPException(400, "Write a message first.")
     ts = db.now()
@@ -373,6 +412,7 @@ async def generate_item(payload: dict = Body(...), user: dict = User) -> dict:
     name = (payload.get("name") or "").strip()[:80]
     kind = payload.get("kind") or "content"
     prompt = (payload.get("prompt") or "").strip()
+    _check_length(prompt, MAX_MESSAGE, "The description of what to generate")
     project_id = payload.get("project_id")
     chat_id = payload.get("chat_id")
     if not name:
@@ -561,6 +601,7 @@ async def post_group_message(group_id: str, channel_id: str, payload: dict = Bod
     require_member(group_id, user)
     require_channel(group_id, channel_id)
     content = (payload.get("content") or "").strip()
+    _check_length(content, MAX_MESSAGE, "Messages")
     ai_mode = payload.get("ai_mode") or "none"
     if not content:
         raise HTTPException(400, "Write a message first.")
@@ -714,6 +755,7 @@ async def brief_update(group_id: str, payload: dict = Body(...), user: dict = Us
     """Edit the brief; any edit sends it back to draft for the host to approve."""
     require_member(group_id, user)
     content = (payload.get("content") or "").strip()
+    _check_length(content, MAX_BRIEF, "The brief")
     if not content:
         raise HTTPException(400, "The brief cannot be empty.")
     brief, events = pipeline.update_brief(group_id, content, user["id"])
@@ -761,6 +803,7 @@ async def ticket_create(group_id: str, payload: dict = Body(...), user: dict = U
     title = (payload.get("title") or "").strip()[:140]
     if not title:
         raise HTTPException(400, "Give the task a title.")
+    _check_length((payload.get("detail") or "").strip(), MAX_SHORT, "Task details")
     priority = payload.get("priority") or "Medium"
     if priority not in ("Low", "Medium", "High"):
         raise HTTPException(400, "Priority must be Low, Medium or High.")
@@ -784,6 +827,7 @@ async def ticket_create(group_id: str, payload: dict = Body(...), user: dict = U
 async def ticket_update(group_id: str, ticket_id: str, payload: dict = Body(...), user: dict = User) -> dict:
     """Host only: edit a task (title, detail, priority, hours, owner, status)."""
     require_host(group_id, user)       # tasks are part of the shared plan
+    _validate_ticket_patch(group_id, payload)
     try:
         ticket, events = pipeline.update_ticket(group_id, ticket_id, payload, user["id"])
     except ValueError as exc:
@@ -819,6 +863,7 @@ async def alert_resolve(group_id: str, alert_id: str, payload: dict = Body(...),
     """Host only: approve a resolution; records a decision and runs the QA agent."""
     require_host(group_id, user)
     resolution = (payload.get("resolution") or "").strip()
+    _check_length(resolution, MAX_SHORT, "The resolution")
     if not resolution:
         raise HTTPException(400, "Say what the team decided.")
     try:
@@ -911,6 +956,7 @@ async def create_future(group_id: str, payload: dict = Body(...), user: dict = U
     """Start a Parallel Futures scenario for members to answer independently."""
     require_member(group_id, user)
     scenario = (payload.get("scenario") or "").strip()
+    _check_length(scenario, MAX_SHORT, "The scenario")
     if not scenario:
         raise HTTPException(400, "Describe the scenario everyone should answer.")
     fid = db.new_id()
@@ -930,6 +976,7 @@ async def answer_future(group_id: str, future_id: str, payload: dict = Body(...)
     if not db.q1("SELECT 1 FROM futures WHERE id=? AND group_id=?", (future_id, group_id)):
         raise HTTPException(404, "Not found.")
     answer = (payload.get("answer") or "").strip()
+    _check_length(answer, MAX_SHORT, "Answers")
     if not answer:
         raise HTTPException(400, "Write your answer first.")
     if db.q1("SELECT 1 FROM future_answers WHERE future_id=? AND user_id=?", (future_id, user["id"])):
@@ -971,6 +1018,7 @@ async def unit_test(group_id: str, ticket_id: str, payload: dict = Body(...), us
     if not ticket:
         raise HTTPException(404, "Task not found.")
     description = (payload.get("description") or "").strip()
+    _check_length(description, MAX_SHORT, "Descriptions")
     if not description:
         raise HTTPException(400, "Describe the task in your own words.")
     row = db.q1("SELECT * FROM unit_tests WHERE ticket_id=?", (ticket_id,))

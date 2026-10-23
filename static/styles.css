@@ -271,7 +271,9 @@ textarea.field { height: auto; padding: 9px 11px; resize: vertical; line-height:
 .md li { margin-bottom: 4px; }
 .md code { font-family: var(--mono); font-size: 13px; background: var(--surface-2); padding: 1.5px 5px; border-radius: 4px; }
 .md blockquote { margin: 0 0 12px; padding-left: 12px; border-left: 2px solid var(--line); color: var(--text-dim); }
+.md .tablewrap { overflow-x: auto; margin-bottom: 12px; }
 .md table { border-collapse: collapse; margin-bottom: 12px; font-size: 14px; }
+.md .tablewrap table { margin-bottom: 0; }
 .md th, .md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
 
 .codeblock { position: relative; margin: 0 0 14px; }
