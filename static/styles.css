@@ -640,8 +640,12 @@ img.gen { max-width: 100%; border-radius: var(--radius); border: 1px solid var(-
   .thread-inner, .msgs, .board-inner { padding-left: 14px; padding-right: 14px; }
   .composer { padding-left: 14px; padding-right: 14px; }
   .sidepanel { width: 100%; max-width: 100%; }
+  /* Hide the role label ('Member' / 'You are the host') to make room for 'My private AI'. */
+  #groupRole { display: none; }
 }
 #btnMenu { display: none; }
+/* Keep '# channel' on one line next to the 'My private AI' button. */
+#channelName { white-space: nowrap; }
 
 /* Respect the system's 'reduce motion' setting. */
 @media (prefers-reduced-motion: reduce) {

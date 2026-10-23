@@ -1,7 +1,7 @@
 // Group chat: channels, grouped messages, replies, reactions, typing, AI modes.
 
 import { api, on, state } from './api.js';
-import { $, autoGrow, avatar, clear, el, emptyState, icon, markdown, relative, skeleton, timeOf, toast } from './ui.js';
+import { $, autoGrow, avatar, clear, el, emptyState, icon, markdown, relative, sidePanel, skeleton, timeOf, toast } from './ui.js';
 
 const EMOJI = ['👍', '🎯', '🔥', '🙌', '👀'];
 // This module's state: the composer's AI mode ('none', 'public' or 'private'),
@@ -58,6 +58,7 @@ export async function openGroup(groupId) {
   renderHostControls();
   updateAiSeg();
   await openChannel(state.channelId);
+  refreshPrivateHistoryIfOpen();
 }
 
 // Draw the channel list.
@@ -271,11 +272,54 @@ function renderPrivate(item) {
   const panel = el('div', { class: 'privatepanel' });
   const head = el('div', { class: 'ph' }, icon('lock', 13), 'Private help — only you can see this',
     el('span', { class: 'spacer' }), el('span', { class: 'meta' }, relative(item.created_at)));
-  const close = el('button', { class: 'iconbtn' }, icon('close', 13));
-  close.addEventListener('click', () => clear($('#privateArea')));
+  // Closing only hides the panel; the question and answer stay saved in My private AI.
+  const close = el('button', { class: 'iconbtn', title: 'Close (kept in My private AI)', 'aria-label': 'Close private help' },
+    icon('close', 13));
+  close.addEventListener('click', () => {
+    clear($('#privateArea'));
+    toast('Kept in My private AI');
+  });
   head.append(close);
   panel.append(head, el('div', { class: 'meta', style: 'margin-bottom:6px' }, `You asked: ${item.prompt}`), markdown(item.answer));
   area.append(panel);
+}
+
+// ---------------------------------------------------------------- my private AI
+// Your private AI questions and answers in this group, newest first, with the time
+// and channel of each. The server returns only the signed-in user's own (the last
+// 20), so nobody else can open them.
+async function showPrivateHistory() {
+  if (!state.group) return;
+  // Open the side panel at once with a loading placeholder, then fill it in.
+  const body = el('div', {}, skeleton(3));
+  sidePanel('My private AI', body);
+  try {
+    const { help } = await api(`/groups/${state.group.group.id}/private-help`);
+    clear(body).append(el('p', { class: 'meta' }, 'Only you can see these. The group only saw that you used AI.'));
+    if (!help.length) {
+      body.append(emptyState({
+        art: 'lock', title: 'No private questions yet',
+        text: 'Choose Private help above the message box and ask anything. Your question and the answer are kept here.',
+      }));
+      return;
+    }
+    // One card per answer: when and in which channel, your question, then the AI's answer.
+    for (const h of help) {
+      const channel = state.group.channels.find((c) => c.id === h.channel_id);
+      body.append(el('div', { class: 'card' },
+        el('div', { class: 'meta' }, `${relative(h.created_at)} · ${timeOf(h.created_at)}${channel ? ` · #${channel.name}` : ''}`),
+        el('p', { style: 'margin:6px 0 8px' }, el('strong', {}, 'You asked: '), h.prompt),
+        markdown(h.answer)));
+    }
+  } catch (err) {
+    clear(body);
+    toast(err.message, 'err');
+  }
+}
+
+// Keep the list current when it is already open (a new answer, or another group).
+function refreshPrivateHistoryIfOpen() {
+  if ($('#sidePanel').classList.contains('open') && $('#spTitle').textContent === 'My private AI') showPrivateHistory();
 }
 
 // ---------------------------------------------------------------- sending
@@ -296,6 +340,9 @@ export function initGroupComposer() {
     }
   });
   $('#groupSend').addEventListener('click', sendGroupMessage);
+  // The 'My private AI' button in the channel header opens your saved private answers.
+  $('#privateHistory').prepend(icon('lock', 13));
+  $('#privateHistory').addEventListener('click', showPrivateHistory);
 }
 
 // Send a message (plain, public AI or private help).
@@ -313,7 +360,10 @@ async function sendGroupMessage() {
   try {
     const res = await api(`/groups/${state.group.group.id}/channels/${state.channelId}/messages`, { method: 'POST', body });
     // Private help comes back only in this response, never over the group's live feed.
-    if (res.private_help) renderPrivate(res.private_help);
+    if (res.private_help) {
+      renderPrivate(res.private_help);
+      refreshPrivateHistoryIfOpen();
+    }
     if (res.alert && openAlert) {
       toast('The Architect agent flagged something in the shared workspace', 'err');
     }

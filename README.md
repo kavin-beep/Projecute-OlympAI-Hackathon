@@ -175,7 +175,7 @@ plan.**
 | Area | What you can do |
 |---|---|
 | 💬 **Individual chat** | Private AI answers, ideas, explanations and learning. Streamed Markdown replies, chats grouped by date, rename, delete and search. Nothing here reaches the group unless you share it. |
-| 👥 **Group chat** | Channels, replies, reactions and a typing indicator. Choose **public AI** (the answer is posted for everyone) or **private help** (only you see it; the group sees just *"Name used AI"*). The host can switch either mode off. |
+| 👥 **Group chat** | Channels, replies, reactions and a typing indicator. Choose **public AI** (the answer is posted for everyone) or **private help** (only you see it; the group sees just *"Name used AI"*). The host can switch either mode off. **My private AI** (in the channel header) keeps your own private questions and answers with their time and channel, even after you close the answer panel. |
 | 🗂️ **Individual workspace** | Generate named items: content, email drafts, code (stored as text, never executed), images and audio. Organise them in projects, search by name, edit them, follow a link back to the source chat, and share an item to the group or make it private again. |
 | 🏢 **Group workspace** | Seven sections with live count badges: **Brief** (with Parallel Futures), **Sources** (PRDs, bug tickets, meeting summaries), **Tasks** (any member can submit one; the host approves), **Decisions** (each lists the tasks it changes), **Alerts** (resolve, or dismiss a false alert), **Activity** (the multi-agent event stream, downloadable as JSON) and **Team outputs**. |
 
@@ -477,6 +477,7 @@ docker run -p 8000:8000 -e GROQ_API_KEY=your-key projecute
 | Header says **Demo mode** | No Groq key is set. Add one to `.env` and restart; see Quick start |
 | No internet on first run | The app still starts and uses the TF-IDF search fallback; Settings → Advanced shows which search is active |
 | Want a clean demo again | Press **Load demo** on the sign-in screen, or run `python -m scripts.seed_demo` |
+| Setup fails with `No such file or directory` during install (Windows) | The folder path is too long for Windows. Move the `projecute` folder somewhere short, such as `C:\projecute`, delete its `.venv` folder, and run `run.bat` again |
 
 ---
 
@@ -499,7 +500,9 @@ docker run -p 8000:8000 -e GROQ_API_KEY=your-key projecute
    decision is recorded, and the QA agent's acceptance criteria appear.
 6. **Privacy (20s).** In Sritharan's window, switch to **Private help** and ask
    anything. Kavin's window shows only *"Sritharan N S used AI"*, with no prompt,
-   answer or topic. Finish on **Activity**: every agent action, timestamped.
+   answer or topic. Close the answer with **×**, then open **My private AI** in
+   Sritharan's channel header: the question and answer are kept there with their
+   time. Finish on **Activity**: every agent action, timestamped.
 
 **Extra (60s): PRDs, bug tickets and meeting summaries.** Open **Sources → Add a
 source** and paste any of these:
@@ -541,7 +544,7 @@ source** and paste any of these:
 | `static/js/api.js` | API calls, streamed responses, the live WebSocket connection and event bus |
 | `static/js/ui.js` | Shared UI helpers: elements, icons, dialogs, toasts, safe Markdown, time formatting |
 | `static/js/chat.js` | Individual chat |
-| `static/js/group.js` | Group chat: channels, messages, reactions, replies, AI modes, host controls |
+| `static/js/group.js` | Group chat: channels, messages, reactions, replies, AI modes, host controls, and **My private AI** (your saved private questions and answers) |
 | `static/js/workspace.js` | Individual workspace: projects, named items, sharing |
 | `static/js/board.js` | Group workspace: Brief, Sources, Tasks, Decisions, Alerts, Activity, Team outputs, Parallel Futures, Human Unit Test |
 | **scripts/** | **Command-line tools** |
@@ -612,6 +615,7 @@ in the interface:
 - **The group AI reads only that group's messages.** Private prompts and replies
   stay isolated.
 - **Private AI use is announced, but the prompt, answer and topic stay hidden.**
+  Only the asker can open them again, under **My private AI**.
 - **The host approves** settings, permissions, roles and changes to the shared
   plan.
 - **Groups are isolated.** Channels, messages and scenarios must belong to the
@@ -629,7 +633,7 @@ The competition rules require naming every AI tool used. We used:
 | Tool | What it was used for |
 |---|---|
 | **OpenAI ChatGPT / Codex** | Generated most of the application code under the team's direction, and helped with brainstorming, project guidance and presentation preparation |
-| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck, the challenge brief and the submission rules; fixed cross-group access bugs; made task edits host-only; added the source cross-checks (PRDs, bug tickets, meeting summaries), blocker detection, bug triage, member task submissions, false-alert dismissal, decision impact and the event-log download; built the GitHub Issues benchmark and the simulated conflict-resolution tests; added code comments and lint fixes, the hosting and run scripts, the assistant's Projecute AI identity and answers about the app, and this README with its credits |
+| **Claude Code (Anthropic, Claude Opus 5.5)** | Reviewed the prototype against the deck, the challenge brief and the submission rules; fixed cross-group access bugs; made task edits host-only; added the source cross-checks (PRDs, bug tickets, meeting summaries), blocker detection, bug triage, member task submissions, false-alert dismissal, decision impact and the event-log download; built the GitHub Issues benchmark and the simulated conflict-resolution tests; added code comments and lint fixes, the hosting and run scripts, the assistant's Projecute AI identity and answers about the app, the **My private AI** history in group chat, and this README with its credits |
 
 The team chose the problem, designed the concept, the deck and the demo story, and
 directed the AI tools.
@@ -671,6 +675,9 @@ directed the AI tools.
 - Browser testing with two users at once: all four areas, both themes, and the
   390 px mobile layout, including the Sources, Tasks and Alerts screens, with no
   JavaScript errors.
+- **My private AI**: closing a private answer keeps it; the list shows each
+  question and answer with time and channel, newest first, updates while open,
+  and another member's list stays empty.
 
 **Not yet verified:**
 
