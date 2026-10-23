@@ -17,7 +17,7 @@
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-agents-1C3C3C">
   <img alt="FAISS" src="https://img.shields.io/badge/Sentence%20Transformers-FAISS-4FE0A8">
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-storage-003B57?logo=sqlite&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-36%20passed-2EA44F">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-39%20passed-2EA44F">
 </p>
 
 ---
@@ -115,7 +115,7 @@ deck, with where to see it.
 | 5 | Individual chat, group chat (public AI or private help with usage-only notices), individual workspace (content, emails, code as named items), group workspace; host approves assignments and group changes, including AI access | All four areas; host-only approvals and AI switches, enforced server-side |
 | 6 | HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled mock mode; Pydantic, retries, cache, backoff; Kaggle GitHub Issues subset + planted conflicts | All used, except that the GitHub issues come from GitHub itself rather than Kaggle's copy, which has no duplicate labels to score against (explained in [Data and evaluation](#-data-and-evaluation)); see also [How it works](#-how-it-works-the-agent-pipeline) |
 | 7 | PM brief edited by team, approved by host; tickets with owner; embeddings + FAISS + Architect; flags with sources, dependent tickets, hours; host resolves; QA criteria; live dashboard | The pipeline, step by step |
-| 8 | Two-user dashboard, ticket generator, event stream; duplicate precision/recall on real issues; 15+ planted conflicts with detection and evidence; private/public access, host approvals, live updates verified | Duplicate precision/recall on 45 real GitHub pairs; 18 planted conflicts (rules and live AI); 36 tests |
+| 8 | Two-user dashboard, ticket generator, event stream; duplicate precision/recall on real issues; 15+ planted conflicts with detection and evidence; private/public access, host approvals, live updates verified | Duplicate precision/recall on 45 real GitHub pairs; 18 planted conflicts (rules and live AI); 39 tests |
 | 9 | Real-world uses: student teams, software teams catching conflicting API / login / storage requirements, client teams tracing scope changes | The demo is a software team's login conflict traced to its tasks and owners; GitHub and document integrations are in [Future scope](#-future-scope-what-projecute-doesnt-do-yet) |
 | 10 | Decision impact; each affected ticket once with team-confirmed hours; Parallel Futures; Human Unit Test; exact messages on every flag; host approves | Decisions list their tasks; impact line; Brief → Parallel Futures; task panel → Human Unit Test |
 | 11 | Cache, batch, backoff, mock mode; evidence, "unclear", human review; separate storage and permission checks; one complete two-user workflow | Answer cache, batched Architect calls, retry with backoff, labelled demo mode; "unclear" alerts and **Dismiss**; permission tests |
@@ -372,7 +372,7 @@ the deck says, *Stage 1 makes no accuracy claims*. Raw results are in
 ### Planted conflicts, simulation, tests
 
 ```
-pytest                         36 passed
+pytest                         39 passed
 
 evaluate_conflicts             18 scenarios, each with 5 distractors
   built-in rules               detection 18/18 · evidence 16/16
@@ -567,6 +567,7 @@ source** and paste any of these:
 | `tests/test_live_updates.py` | WebSocket updates reach the other member's window |
 | `tests/test_llm_recovery.py` | With a key, a provider error never switches the app to demo answers: chat asks to try again, agent steps use the rules for that step |
 | `tests/test_sources.py` | PRD conflicts, meeting-summary blockers, bug triage and duplicate bugs, member task submissions, dismissing false alerts, decision impact, the event-log download |
+| `tests/test_innovations.py` | Parallel Futures in demo mode: differing answers are never reported as an agreement; contradictions and matching answers are labelled correctly |
 | `tests/__init__.py` | Marks `tests` as a package |
 | **data/** | |
 | `data/sample_duplicates_SYNTHETIC.csv` | 16 synthetic labelled pairs for the duplicate smoke test |
@@ -656,11 +657,12 @@ directed the AI tools.
 
 **Verified:**
 
-- 36 automated tests: privacy, host approvals, group isolation, the demo passcode,
+- 39 automated tests: privacy, host approvals, group isolation, the demo passcode,
   staying in live mode on provider errors and switching to the backup model, input
   validation, live updates, and source cross-checks (PRD conflicts, blockers, bug
   triage, duplicate bugs, task submissions, dismissals, decision impact, event-log
-  download).
+  download), and Parallel Futures in demo mode never reporting an agreement the
+  rules did not find.
 - A stress test of every endpoint with odd and oversized input and other teams'
   IDs: no crashes and no data leaks.
 - In the browser: adding a PRD raised a contradiction quoting the PRD line and

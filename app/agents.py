@@ -426,7 +426,9 @@ def compare_futures(scenario: str, answers: list[dict]) -> tuple[FuturesComparis
         """Demo-mode comparison: pairwise rule-based checks between answers."""
         if len(answers) < 2:
             return {"summary": "Waiting for more answers before comparing.", "agreements": [], "hidden_assumptions": []}
-        agreements, hidden = [], []
+        # Sort every pair of answers into: a clear disagreement, a clear match, or
+        # neither (the rules can't tell, so a person should compare them).
+        agreements, hidden, different = [], [], []
         for i in range(len(answers)):
             for j in range(i + 1, len(answers)):
                 a, b = answers[i], answers[j]
@@ -435,11 +437,24 @@ def compare_futures(scenario: str, answers: list[dict]) -> tuple[FuturesComparis
                     hidden.append(f"{a['author']} and {b['author']} disagree: {v.headline.lower()}")
                 elif v.kind == "duplicate" or similarity(a["answer"], b["answer"]) >= 0.45:
                     agreements.append(f"{a['author']} and {b['author']} described the same outcome")
+                else:
+                    different.append(f"{a['author']} and {b['author']} described it differently; "
+                                     "read both answers to find the assumption")
+        # Only say everyone agreed when every pair matched; never claim an agreement
+        # the rules did not find.
+        if hidden:
+            summary = f"{len(hidden)} hidden assumption(s) surfaced from {len(answers)} answers."
+            if different:
+                summary += " Some other answers also differ; read them side by side."
+        elif different:
+            summary = ("The answers differ in ways the built-in rules can't name. "
+                       "Read them side by side to find the assumption.")
+        else:
+            summary = "Everyone described the scenario the same way."
         return {
-            "summary": ("Everyone described the scenario the same way." if not hidden
-                        else f"{len(hidden)} hidden assumption(s) surfaced from {len(answers)} answers."),
+            "summary": summary,
             "agreements": agreements[:5],
-            "hidden_assumptions": hidden[:5],
+            "hidden_assumptions": (hidden + different)[:5],
         }
 
     # Live mode: the model reads every answer side by side.
