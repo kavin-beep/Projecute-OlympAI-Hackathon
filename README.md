@@ -89,7 +89,7 @@ deck, with where to see it.
 | 1. Simultaneous multi-user sessions with role-based agents (PM, QA, Architect) | Separate sessions per window; PM, Architect and QA agents in LangGraph; tests: `test_live_updates.py`, `test_privacy.py` |
 | 2. Parse unstructured chat logs into structured tickets (Task, Priority, Estimated Hours) | PM agent → Pydantic `TicketProposal` (title, detail, priority, estimated_hours, owner) |
 | 3. Conflict-detection agent flags duplicate issues or contradicting requirements across team submissions | Architect agent on chat messages, source documents and submitted tasks: duplicate / contradiction / assumption / unclear |
-| Dataset: GitHub Issues, used to benchmark clustering, de-duplication and triage | 45 real duplicate pairs and 260 labelled issues from github.com/golang/go, scored for de-duplication, search, clustering and triage: [results](#real-github-issues-benchmark) (Kaggle's copy has no duplicate labels; see why there) |
+| Dataset: GitHub Issues, used to benchmark clustering, de-duplication and triage | 45 real duplicate pairs and 260 labelled issues from github.com/golang/go, scored for de-duplication, search, clustering and triage: [results](#real-github-issues-benchmark) (Kaggle's copy doesn't link a duplicate to the issue it duplicates; see why there) |
 | Target stack | Python, FastAPI + WebSockets, LangGraph, FAISS; the web UI is HTML/CSS/JS as our deck specifies |
 | Deliverable: live collaborative web dashboard | <https://projecute.onrender.com>, plus local run scripts |
 | Deliverable: multi-agent event stream logs | **Activity** (live, timestamped) and **Download event log** (JSON) |
@@ -118,7 +118,7 @@ deck, with where to see it.
 | 3 | Problem: different assumptions from separate AI chats, buried decisions, duplicate tasks and conflicting plans, no source evidence | [The problem](#-the-problem); each point is answered by a feature below |
 | 4 | Individual AI chat; reusable outputs; one shared brief and assigned tasks; expose conflicts before implementation | Individual chat, individual workspace, Brief + Tasks, Alerts |
 | 5 | Individual chat, group chat (public AI or private help with usage-only notices), individual workspace (content, emails, code as named items), group workspace; host approves assignments and group changes, including AI access | All four areas; host-only approvals and AI switches, enforced server-side |
-| 6 | HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled mock mode; Pydantic, retries, cache, backoff; Kaggle GitHub Issues subset + planted conflicts | All used, except that the GitHub issues come from GitHub itself rather than Kaggle's copy, which has no duplicate labels to score against (explained in [Data and evaluation](#-data-and-evaluation)); see also [How it works](#-how-it-works-the-agent-pipeline) |
+| 6 | HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled mock mode; Pydantic, retries, cache, backoff; Kaggle GitHub Issues subset + planted conflicts | All used, except that the GitHub issues come from GitHub itself rather than Kaggle's copy, which doesn't link a duplicate to the issue it duplicates, so it can't score de-duplication (explained in [Data and evaluation](#-data-and-evaluation)); see also [How it works](#-how-it-works-the-agent-pipeline) |
 | 7 | PM brief edited by team, approved by host; tickets with owner; embeddings + FAISS + Architect; flags with sources, dependent tickets, hours; host resolves; QA criteria; live dashboard | The pipeline, step by step |
 | 8 | Two-user dashboard, ticket generator, event stream; duplicate precision/recall on real issues; 15+ planted conflicts with detection and evidence; private/public access, host approvals, live updates verified | Duplicate precision/recall on 45 real GitHub pairs; 18 planted conflicts (rules and live AI); 39 tests |
 | 9 | Real-world uses: student teams, software teams catching conflicting API / login / storage requirements, client teams tracing scope changes | The demo is a software team's login conflict traced to its tasks and owners; GitHub and document integrations are in [Future scope](#-future-scope-what-projecute-doesnt-do-yet) |
@@ -317,8 +317,8 @@ server enforces this, not just the interface, and tests cover it.
 ### Real GitHub Issues benchmark
 
 **Why GitHub's own data rather than Kaggle's copy.** The deck and the challenge
-name the Kaggle GitHub Issues dataset. Its dumps carry issue titles and bodies,
-but no record of which issues are duplicates, so they cannot score
+name the Kaggle GitHub Issues dataset. Its dumps carry issue titles, bodies and labels,
+but no link from a duplicate to the issue it duplicates, so they cannot score
 de-duplication. We used the same kind of data, real GitHub issues, taken from the
 Go project with its **own answer key**:
 - **Duplicates:** the maintainers' *"Duplicate of #N"* comments.
