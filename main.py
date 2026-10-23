@@ -6,7 +6,7 @@ server. On a fresh database the demo team and project are staged automatically.
 
 Environment variables (all optional):
   HOST            address to listen on (default 127.0.0.1; the Docker image uses 0.0.0.0)
-  PORT            port to listen on (default 8000; Hugging Face Spaces uses 7860)
+  PORT            port to listen on (default 8000; hosting services may set their own)
   GROQ_API_KEY    enables live AI; without it the app runs in labelled demo mode
   DEMO_PASSCODE   when set, "Load demo" asks for it before resetting the data
   OPEN_BROWSER    when set to 1, opens the app in your browser once it is ready

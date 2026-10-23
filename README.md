@@ -460,12 +460,11 @@ automatically.
 
 The same app runs unchanged in a container on any Docker host, and live updates
 over WebSockets keep working. Pass the API key as an environment variable or a
-host secret, never in the files. `deploy/huggingface/README.md` holds the page
-settings for a Hugging Face Docker Space, which needs a paid Hugging Face plan.
+host secret, never in the files. Then open <http://localhost:8000>.
 
 ```bash
 docker build -t projecute .
-docker run -p 7860:7860 -e GROQ_API_KEY=your-key -e DEMO_PASSCODE=choose-one projecute
+docker run -p 8000:8000 -e GROQ_API_KEY=your-key projecute
 ```
 
 ## 🩺 Troubleshooting
@@ -574,9 +573,8 @@ source** and paste any of these:
 | `.env.example` | Template for `.env` (no real keys) |
 | `.gitignore` | Keeps `.env`, the database and caches out of git |
 | `.gitattributes` | Keeps Windows line endings in `run.bat` and Unix line endings in `run.sh` |
-| `Dockerfile` | Container image for Hugging Face Spaces or any Docker host |
+| `Dockerfile` | Optional container image for running Projecute with Docker |
 | `.dockerignore` | Keeps `.env` and local data out of the image |
-| `deploy/huggingface/README.md` | Page settings for an optional Hugging Face Docker Space (needs a paid Hugging Face plan) |
 | `README.md` | This document |
 
 ---
