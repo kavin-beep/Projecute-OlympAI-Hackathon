@@ -1,7 +1,7 @@
 """SQLite storage for Projecute.
 
 All reads go through helpers that take the *requesting* user id so privacy is
-enforced in the backend, not in the UI (deck slide 12).
+enforced in the backend, not in the UI (deck slides 11 and 14).
 """
 # How to read this file
 # ---------------------

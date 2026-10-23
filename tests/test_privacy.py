@@ -1,4 +1,4 @@
-"""Privacy rules from slide 12, enforced in the backend.
+"""Privacy rules from slide 14, enforced in the backend.
 
 User A can never read B's individual chats, workspace items or private AI help,
 and individual content only enters a group through explicit sharing.

@@ -110,14 +110,19 @@ deck, with where to see it.
 
 | Slide | Promise | Where it is met |
 |---|---|---|
+| 3 | Problem: different assumptions from separate AI chats, buried decisions, duplicate tasks and conflicting plans, no source evidence | [The problem](#-the-problem); each point is answered by a feature below |
 | 4 | Individual AI chat; reusable outputs; one shared brief and assigned tasks; expose conflicts before implementation | Individual chat, individual workspace, Brief + Tasks, Alerts |
 | 5 | Individual chat, group chat (public AI or private help with usage-only notices), individual workspace (content, emails, code as named items), group workspace; host approves assignments and group changes, including AI access | All four areas; host-only approvals and AI switches, enforced server-side |
 | 6 | HTML/CSS/JS; FastAPI + WebSockets; SQLite; Sentence Transformers + FAISS; LangGraph; free-tier LLM adapter + labelled mock mode; Pydantic, retries, cache, backoff; Kaggle GitHub Issues subset + planted conflicts | All used, except that the GitHub issues come from GitHub itself rather than Kaggle's copy, which has no duplicate labels to score against (explained in [Data and evaluation](#-data-and-evaluation)); see also [How it works](#-how-it-works-the-agent-pipeline) |
 | 7 | PM brief edited by team, approved by host; tickets with owner; embeddings + FAISS + Architect; flags with sources, dependent tickets, hours; host resolves; QA criteria; live dashboard | The pipeline, step by step |
 | 8 | Two-user dashboard, ticket generator, event stream; duplicate precision/recall on real issues; 15+ planted conflicts with detection and evidence; private/public access, host approvals, live updates verified | Duplicate precision/recall on 45 real GitHub pairs; 18 planted conflicts (rules and live AI); 36 tests |
+| 9 | Real-world uses: student teams, software teams catching conflicting API / login / storage requirements, client teams tracing scope changes | The demo is a software team's login conflict traced to its tasks and owners; GitHub and document integrations are in [Future scope](#-future-scope-what-projecute-doesnt-do-yet) |
 | 10 | Decision impact; each affected ticket once with team-confirmed hours; Parallel Futures; Human Unit Test; exact messages on every flag; host approves | Decisions list their tasks; impact line; Brief → Parallel Futures; task panel → Human Unit Test |
 | 11 | Cache, batch, backoff, mock mode; evidence, "unclear", human review; separate storage and permission checks; one complete two-user workflow | Answer cache, batched Architect calls, retry with backoff, labelled demo mode; "unclear" alerts and **Dismiss**; permission tests |
+| 12 | Planned demo: guest checkout agreed, brief confirmed, AI creates tasks, a new login requirement triggers a conflict with source messages, tickets and hours, host approves, both dashboards update | Built and runnable: [two-minute demo script](#-two-minute-demo-script), on the live site or locally |
+| 13 | Future scope: GitHub, document and meeting sources; larger teams and permissions; multilingual evaluation and dependency visualisation; expand after user feedback | [Future scope](#-future-scope-what-projecute-doesnt-do-yet), and Projecute AI answers the same when asked |
 | 14 | Explicit sharing only; group AI reads only group messages; private AI use announced with no content; host approves settings; public or synthetic demo text; keys in environment files | Privacy tests; `.env` and Render secrets |
+| 15–16 | Team roles; thanks to the organisers, MethodAI, ChatGPT/Codex and our mentor | [Team and acknowledgements](#-team-and-acknowledgements), [AI tools used](#-ai-tools-used) |
 | 17 | Find items by name in projects; items link to source chat; private until shared; team outputs beside decisions; editable text and code, never executed | Individual workspace and Team outputs |
 
 ## Contents
@@ -773,7 +778,7 @@ libraries are installed from `requirements.txt` and are not bundled in it.
 | Library | Used for | Licence |
 |---|---|---|
 | [FastAPI](https://fastapi.tiangolo.com) | Web framework, HTTP API | MIT |
-| [Uvicorn](https://www.uvicorn.org) | Web server | BSD-3-Clause |
+| [Uvicorn](https://uvicorn.dev) | Web server | BSD-3-Clause |
 | [websockets](https://websockets.readthedocs.io) | Live updates | BSD-3-Clause |
 | [Pydantic](https://docs.pydantic.dev) | Validating AI output | MIT |
 | [python-multipart](https://github.com/Kludex/python-multipart) | Request parsing | Apache-2.0 |

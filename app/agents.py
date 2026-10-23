@@ -1,7 +1,7 @@
 """Agent orchestration (LangGraph).
 
-Three agents from slide 5: PM (brief + tickets), Architect (meaning check over
-retrieved claims) and QA (acceptance criteria), plus the two slide-8
+Three agents from slide 7: PM (brief + tickets), Architect (meaning check over
+retrieved claims) and QA (acceptance criteria), plus the two slide-10
 innovations (Parallel Futures comparison, Human Unit Test comparison).
 
 Each agent asks the LLM for JSON, validates it with Pydantic, and falls back to
@@ -15,7 +15,7 @@ are real rules over the text — nothing about a specific demo is hard-coded.
 #   2. PM agent        - chat -> project brief -> proposed tickets.
 #   3. Architect agent - compares two statements: contradiction / assumption / duplicate.
 #   4. QA agent        - acceptance criteria after a decision.
-#   5. Parallel Futures and Human Unit Test comparisons (deck slide 8).
+#   5. Parallel Futures and Human Unit Test comparisons (deck slide 10).
 #   6. Source documents - splitting PRDs / bug tickets / meetings, blockers, triage.
 #   7. LangGraph pipelines - the three graphs that chain the agents together.
 # Every agent function has the same shape: llm.structured(Schema, system=..., user=...,
