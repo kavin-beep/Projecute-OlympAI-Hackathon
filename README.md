@@ -846,7 +846,7 @@ libraries are installed from `requirements.txt` and are not bundled in it.
 | Member | Contribution |
 |---|---|
 | **Kavin K** (team leader) | Backend, permissions and live collaboration |
-| **Adrian Rohith** | Chat interface and connected workspace |
+| **Adrian Rohith C** | Chat interface and connected workspace |
 | **Sritharan N S** | AI workflow, evaluation and demo preparation |
 
 Thanks to the **OlympAI Hackathon** organisers and **MethodAI**, to our mentor
