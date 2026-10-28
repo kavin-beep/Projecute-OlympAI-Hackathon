@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>OlympAI Hackathon · Stage 1 prototype · Category 9–12 Advanced Coders</b><br>
-  Team <b>Monarch Core</b> — Kavin K (team leader), Adrian Rohith, Sritharan N S
+  Team <b>Monarch Core</b> — Kavin K (team leader), Adrian Rohith C, Sritharan N S
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 Nothing to install and no key needed: the hosted prototype runs the PM,
 Architect and QA agents on a live language model for every visitor. Open the link
 in **two browser tabs**, sign in as **Kavin K** (the host) in one and
-**Sritharan N S** in the other, and follow the
+**Sritharan N S** or **Adrian Rohith C** in the other, and follow the
 [two-minute demo](#-two-minute-demo-script).
 
 > **If the first visit takes up to a minute,** the free server is waking up from
