@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>OlympAI Hackathon · Stage 1 prototype · Category 9–12 Advanced Coders</b><br>
-  Team <b>Monarch Core</b> — Kavin K (team leader), Adrian Rohith C, Sritharan N S
+  Team <b>Monarch Core</b> — Kavin K (team leader), Adrian Rohith C, Sritharan NS
 </p>
 
 <p align="center">
